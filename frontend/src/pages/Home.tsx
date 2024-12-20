@@ -1,6 +1,7 @@
 const Home: React.FC = () => {
     return (
-        <div className="flex flex-col min-h-screen bg-light">
+        <div className="relative flex flex-col min-h-screen bg-light overflow-hidden">
+
             {/* Hero Section */}
             <section className="flex-grow flex flex-col md:flex-row items-center justify-between max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
                 {/* Text Content */}

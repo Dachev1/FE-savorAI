@@ -1,4 +1,4 @@
-import { FacebookIcon, LinkedInIcon, InstagramIcon } from '../../public/Icons';
+import { GitHubIcon, LinkedInIcon, InstagramIcon } from '../../public/Icons';
 
 const Footer: React.FC = () => {
     return (
@@ -42,14 +42,16 @@ const Footer: React.FC = () => {
                         <h3 className="text-lg font-bold mb-4 text-accent">Follow Us</h3>
                         <div className="flex space-x-4">
                             <a
-                                href="#"
+                                href="https://github.com/Dachev1"
+                                target='_blank'
                                 className="text-light hover:text-accent hover:scale-110 transition-transform duration-200"
-                                aria-label="Facebook"
+                                aria-label="GitHub"
                             >
-                                <FacebookIcon className="w-6 h-6" />
+                                <GitHubIcon className="w-6 h-6" />
                             </a>
                             <a
-                                href="#"
+                                href="https://www.linkedin.com/in/ivan-d-a64616270"
+                                target='_blank'
                                 className="text-light hover:text-accent hover:scale-110 transition-transform duration-200"
                                 aria-label="LinkedIn"
                             >
@@ -57,6 +59,7 @@ const Footer: React.FC = () => {
                             </a>
                             <a
                                 href="#"
+                                target='_blank'
                                 className="text-light hover:text-accent hover:scale-110 transition-transform duration-200"
                                 aria-label="Instagram"
                             >
