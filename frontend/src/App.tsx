@@ -1,7 +1,8 @@
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
-import Features from './pages/Features';
+import SignIn from './pages/SignInSignUp/SignIn';
+import SignUp from './pages/SignInSignUp/SignUp';
 import { Routes, Route } from 'react-router-dom';
 
 const App: React.FC = () => {
@@ -11,7 +12,8 @@ const App: React.FC = () => {
             <main className="flex-grow">
                 <Routes>
                     <Route path="/" element={<Home />} />
-                    <Route path="/features" element={<Features />} />
+                    <Route path="/signin" element={<SignIn />} />
+                    <Route path="/signup" element={<SignUp />} />
                 </Routes>
             </main>
             <Footer />
