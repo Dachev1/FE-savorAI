@@ -4,10 +4,17 @@ const Navbar: React.FC = () => {
     return (
         <nav className="bg-white shadow-md fixed top-0 w-full z-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center py-4">
-                {/* Logo */}
-                <h1 className="text-3xl font-extrabold text-dark hover:text-accent transition-all">
-                    <Link to="/">SavorAI</Link>
-                </h1>
+                {/* Logo with SVG */}
+                <div className="flex items-center space-x-3">
+                    <img
+                        src="/logo.svg"
+                        alt="SavorAI Logo"
+                        className="h-10 w-10"
+                    />
+                    <h1 className="text-3xl font-extrabold text-dark hover:text-accent transition-all">
+                        <Link to="/">SavorAI</Link>
+                    </h1>
+                </div>
 
                 {/* Navigation Links */}
                 <ul className="hidden md:flex space-x-8 text-secondary text-lg font-medium">

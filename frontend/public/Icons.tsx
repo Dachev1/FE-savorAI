@@ -37,4 +37,5 @@ export const InstagramIcon: React.FC<{ className?: string }> = ({ className }) =
     </svg>
 );
 
+
 export default { GitHubIcon, LinkedInIcon, InstagramIcon };
