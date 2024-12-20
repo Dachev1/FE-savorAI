@@ -1,7 +1,8 @@
+import { Link } from 'react-router-dom';
+
 const Home: React.FC = () => {
     return (
         <div className="relative flex flex-col min-h-screen bg-light overflow-hidden">
-
             {/* Hero Section */}
             <section className="flex-grow flex flex-col md:flex-row items-center justify-between max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
                 {/* Text Content */}
@@ -17,9 +18,12 @@ const Home: React.FC = () => {
                         <button className="px-6 py-3 bg-accent text-white font-bold rounded-full shadow-lg hover:bg-dark hover:scale-105 transition-transform duration-200">
                             Get Started
                         </button>
-                        <button className="px-6 py-3 border border-accent text-accent font-bold rounded-full shadow-lg hover:bg-accent hover:text-white hover:scale-105 transition-transform duration-200">
+                        <Link
+                            to="/learn-more"
+                            className="px-6 py-3 border border-accent text-accent font-bold rounded-full shadow-lg hover:bg-accent hover:text-white hover:scale-105 transition-transform duration-200"
+                        >
                             Learn More
-                        </button>
+                        </Link>
                     </div>
                 </div>
 
