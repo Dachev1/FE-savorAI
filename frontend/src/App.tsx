@@ -5,6 +5,7 @@ import SignIn from './pages/SignInSignUp/SignIn';
 import SignUp from './pages/SignInSignUp/SignUp';
 import LearnMore from './pages/LearnMore';
 import Contact from './pages/Contact';
+import About from './pages/About';
 import { Routes, Route } from 'react-router-dom';
 
 const App: React.FC = () => {
@@ -18,6 +19,7 @@ const App: React.FC = () => {
                     <Route path="/signup" element={<SignUp />} />
                     <Route path="/learn-more" element={<LearnMore />} />
                     <Route path="/contact" element={<Contact />} />
+                    <Route path="/about" element={<About />} />
                 </Routes>
             </main>
             <Footer />
