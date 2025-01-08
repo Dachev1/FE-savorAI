@@ -6,6 +6,7 @@ import SignUp from './pages/SignInSignUp/SignUp';
 import LearnMore from './pages/LearnMore';
 import Contact from './pages/Contact';
 import About from './pages/About';
+import Error from './pages/Error';
 import { Routes, Route } from 'react-router-dom';
 
 const App: React.FC = () => {
@@ -20,6 +21,7 @@ const App: React.FC = () => {
                     <Route path="/learn-more" element={<LearnMore />} />
                     <Route path="/contact" element={<Contact />} />
                     <Route path="/about" element={<About />} />
+                    <Route path="*" element={<Error />} />
                 </Routes>
             </main>
             <Footer />

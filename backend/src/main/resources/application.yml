@@ -21,3 +21,7 @@ logging:
   level:
     root: info
     org.hibernate.SQL: debug
+
+openai:
+  api:
+    key: ${openai_api_key}
