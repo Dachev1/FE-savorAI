@@ -35,7 +35,7 @@ const About: React.FC = () => {
                 >
                     <div className="relative">
                         <img
-                            src="/public/assets/me-photo.jpg" // Replace with your actual image path
+                            src="assets/me-photo.jpg"
                             alt="Ivan Dachev"
                             className="rounded-3xl shadow-2xl w-full md:w-3/4 transform hover:scale-105 transition-transform duration-500"
                         />
