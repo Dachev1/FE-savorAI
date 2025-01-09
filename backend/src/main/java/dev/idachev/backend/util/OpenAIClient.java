@@ -2,33 +2,48 @@ package dev.idachev.backend.util;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Component
 public class OpenAIClient {
 
-    private final WebClient webClient;
+    private static final String BASE_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String SYSTEM_MESSAGE = "You are a helpful assistant who generates recipes.";
 
-    public OpenAIClient(@Value("${openai.api.key}") String apiKey) {
+    private final WebClient webClient;
+    private final Duration timeout;
+
+    public OpenAIClient(
+            @Value("${openai.api.key}") String apiKey,
+            @Value("${openai.api.timeout:10}") int timeoutInSeconds) {
+
+        Objects.requireNonNull(apiKey, "OpenAI API key is missing. Please configure it in application.yml.");
+
         this.webClient = WebClient.builder()
-                .baseUrl("https://api.openai.com/v1/completions")
+                .baseUrl(BASE_URL)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
+
+        this.timeout = Duration.ofSeconds(timeoutInSeconds);
     }
 
     public String getMealSuggestion(String prompt) {
         Map<String, Object> requestBody = Map.of(
-                "model", "text-davinci-003",
-                "prompt", prompt,
-                "max_tokens", 1000,
+                "model", "gpt-4",
+                "messages", List.of(
+                        Map.of("role", "system", "content", SYSTEM_MESSAGE),
+                        Map.of("role", "user", "content", prompt)
+                ),
+                "max_tokens", 100,
                 "temperature", 0.7
         );
 
@@ -36,17 +51,13 @@ public class OpenAIClient {
             return this.webClient.post()
                     .bodyValue(requestBody)
                     .retrieve()
-                    .onStatus(
-                            HttpStatusCode::is4xxClientError,
-                            ClientResponse::createException
-                    )
-                    .onStatus(
-                            HttpStatusCode::is5xxServerError,
-                            ClientResponse::createException
-                    )
                     .bodyToMono(String.class)
-                    .timeout(Duration.ofSeconds(10))
+                    .timeout(this.timeout)
                     .block();
+        } catch (WebClientResponseException e) {
+            String errorDetails = String.format("OpenAI API error - Status: %d, Body: %s",
+                    e.getRawStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException(errorDetails, e);
         } catch (Exception e) {
             throw new RuntimeException("Error fetching meal suggestion: " + e.getMessage(), e);
         }

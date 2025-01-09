@@ -2,12 +2,10 @@ package dev.idachev.backend.controller;
 
 import dev.idachev.backend.service.RecipeService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/recipes")
@@ -20,11 +18,16 @@ public class RecipeController {
     }
 
     @PostMapping("/generate-meal")
-    public ResponseEntity<?> generateMeal(@RequestBody List<String> ingredients) {
+    public ResponseEntity<?> generateMeal(@RequestBody Map<String, List<String>> request) {
+        List<String> ingredients = request.get("ingredients");
         if (ingredients == null || ingredients.isEmpty()) {
             return ResponseEntity.badRequest().body("Ingredients list cannot be empty.");
         }
-        return ResponseEntity.ok(recipeService.generateMeal(ingredients));
-    }
 
+        try {
+            return ResponseEntity.ok(recipeService.generateMeal(ingredients));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
+        }
+    }
 }
