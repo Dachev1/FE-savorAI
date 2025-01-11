@@ -16,14 +16,14 @@ import java.util.Objects;
 public class OpenAIClient {
 
     private static final String BASE_URL = "https://api.openai.com/v1/chat/completions";
-    private static final String SYSTEM_MESSAGE = "You are a helpful assistant who generates recipes.";
+    private static final String SYSTEM_MESSAGE = "You are a professional chef assistant. Generate a unique recipe for each request. Provide detailed step-by-step instructions and ensure the recipe is clear, creative, and complete.";
 
     private final WebClient webClient;
     private final Duration timeout;
 
     public OpenAIClient(
             @Value("${openai.api.key}") String apiKey,
-            @Value("${openai.api.timeout:10}") int timeoutInSeconds) {
+            @Value("${openai.api.timeout:30}") int timeoutInSeconds) {
 
         Objects.requireNonNull(apiKey, "OpenAI API key is missing. Please configure it in application.yml.");
 
@@ -43,8 +43,10 @@ public class OpenAIClient {
                         Map.of("role", "system", "content", SYSTEM_MESSAGE),
                         Map.of("role", "user", "content", prompt)
                 ),
-                "max_tokens", 100,
-                "temperature", 0.7
+                "max_tokens", 500, // Increased to allow detailed instructions
+                "temperature", 1.0, // Increased for more creativity and variety
+                "top_p", 0.9, // Ensures responses are coherent
+                "n", 1 // Ensures one response is generated at a time
         );
 
         try {
