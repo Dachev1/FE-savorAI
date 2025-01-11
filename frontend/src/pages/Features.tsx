@@ -16,6 +16,7 @@ const Features: React.FC = () => {
   const [error, setError] = useState("");
   const [recipe, setRecipe] = useState<RecipeResponse | null>(null);
   const [copySuccess, setCopySuccess] = useState("");
+  const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
     AOS.init({ duration: 1000, easing: "ease-in-out", once: true });
@@ -52,8 +53,12 @@ const Features: React.FC = () => {
         () => setCopySuccess("Failed to copy recipe details.")
       );
 
-      setTimeout(() => setCopySuccess(""), 3000); // Clear the success message after 3 seconds
+      setTimeout(() => setCopySuccess(""), 3000);
     }
+  };
+
+  const toggleFavorite = () => {
+    setIsFavorite((prev) => !prev);
   };
 
   return (
@@ -144,15 +149,24 @@ const Features: React.FC = () => {
               <p className="text-dark/90 leading-relaxed text-md whitespace-pre-wrap mb-4">
                 {recipe.recipeDetails}
               </p>
-              <button
-                onClick={copyToClipboard}
-                className="w-full py-3 rounded-lg bg-gradient-to-r from-accent to-dark
-                           text-white font-semibold text-lg shadow-md
-                           transition-transform duration-300 hover:scale-105
-                           focus:outline-none focus:ring-4 focus:ring-dark"
-              >
-                Copy Recipe Details
-              </button>
+              <div className="flex justify-between items-center">
+                <button
+                  onClick={copyToClipboard}
+                  className="py-3 px-6 rounded-lg bg-gradient-to-r from-accent to-dark
+                             text-white font-semibold text-lg shadow-md
+                             transition-transform duration-300 hover:scale-105
+                             focus:outline-none focus:ring-4 focus:ring-dark"
+                >
+                  Copy Recipe Details
+                </button>
+                <button
+                  onClick={toggleFavorite}
+                  className={`py-3 px-6 rounded-lg text-white font-semibold text-lg
+                             ${isFavorite ? "bg-red-500" : "bg-gray-500"} shadow-md transition-transform duration-300 hover:scale-105`}
+                >
+                  {isFavorite ? "❤️ Added to Favorites" : "🤍 Add to Favorites"}
+                </button>
+              </div>
               {copySuccess && (
                 <p className="text-green-500 font-semibold text-center mt-4">
                   {copySuccess}
