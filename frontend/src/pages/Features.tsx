@@ -15,6 +15,7 @@ const Features: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [recipe, setRecipe] = useState<RecipeResponse | null>(null);
+  const [copySuccess, setCopySuccess] = useState("");
 
   useEffect(() => {
     AOS.init({ duration: 1000, easing: "ease-in-out", once: true });
@@ -41,6 +42,17 @@ const Features: React.FC = () => {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    if (recipe && recipe.recipeDetails) {
+      navigator.clipboard.writeText(recipe.recipeDetails).then(
+        () => setCopySuccess("Recipe details copied to clipboard!"),
+        () => setCopySuccess("Failed to copy recipe details.")
+      );
+
+      setTimeout(() => setCopySuccess(""), 3000); // Clear the success message after 3 seconds
     }
   };
 
@@ -129,9 +141,23 @@ const Features: React.FC = () => {
               <p className="text-lg text-dark leading-relaxed mb-4">
                 <strong>Ingredients Used:</strong> {recipe.ingredientsUsed.join(", ")}
               </p>
-              <p className="text-dark/90 leading-relaxed text-md whitespace-pre-wrap">
+              <p className="text-dark/90 leading-relaxed text-md whitespace-pre-wrap mb-4">
                 {recipe.recipeDetails}
               </p>
+              <button
+                onClick={copyToClipboard}
+                className="w-full py-3 rounded-lg bg-gradient-to-r from-accent to-dark
+                           text-white font-semibold text-lg shadow-md
+                           transition-transform duration-300 hover:scale-105
+                           focus:outline-none focus:ring-4 focus:ring-dark"
+              >
+                Copy Recipe Details
+              </button>
+              {copySuccess && (
+                <p className="text-green-500 font-semibold text-center mt-4">
+                  {copySuccess}
+                </p>
+              )}
             </div>
           )}
         </div>
