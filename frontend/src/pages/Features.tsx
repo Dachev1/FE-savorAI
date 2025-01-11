@@ -49,7 +49,6 @@ const Features: React.FC = () => {
       className="relative flex flex-col min-h-screen bg-gradient-to-br from-light via-softGray to-accent overflow-hidden"
       data-aos="fade-in"
     >
-      {/* Subtle floating accent blobs */}
       <div
         className="absolute top-0 left-0 w-96 h-96 rounded-full bg-accent opacity-20 blur-3xl animate-pulse -z-10"
         data-aos="zoom-in"
@@ -62,80 +61,75 @@ const Features: React.FC = () => {
 
       <div className="flex-grow flex items-center justify-center px-6 sm:px-8 lg:px-12 py-20">
         <div
-          className="w-full max-w-2xl bg-white/70 backdrop-blur-xl rounded-3xl shadow-2xl p-8
-                     border border-white/20 overflow-hidden
-                     transform hover:-translate-y-1 transition-all duration-500
-                     hover:shadow-[0_15px_40px_rgba(0,0,0,0.2)]"
+          className="w-full max-w-3xl bg-white/80 backdrop-blur-md rounded-3xl shadow-lg p-10
+                     border border-gray-200 transition-transform duration-500 hover:-translate-y-2 hover:shadow-2xl"
           data-aos="fade-up"
         >
           <h1
-            className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text
-                       bg-gradient-to-r from-accent to-dark text-center mb-8 drop-shadow-sm"
+            className="text-5xl sm:text-6xl font-extrabold text-transparent bg-clip-text
+                       bg-gradient-to-r from-accent to-dark text-center mb-10 drop-shadow-md"
           >
-            Generate a Meal
+            Discover Your Recipe
           </h1>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-8">
             <div>
               <label
                 htmlFor="ingredients"
-                className="block mb-2 text-sm font-semibold text-dark"
+                className="block mb-3 text-lg font-semibold text-dark"
               >
-                Enter Ingredients (comma separated)
+                Enter Ingredients (comma-separated):
               </label>
               <input
                 id="ingredients"
                 type="text"
-                placeholder="e.g. eggs, bread"
+                placeholder="e.g. chicken, rice, tomatoes"
                 value={ingredients}
                 onChange={(e) => setIngredients(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-4 py-2 text-dark
-                           focus:outline-none focus:ring-2 focus:ring-accent
-                           focus:border-transparent transition-all
-                           placeholder:text-gray-400"
+                className="w-full rounded-lg border border-gray-300 px-5 py-3 text-dark
+                           focus:outline-none focus:ring-4 focus:ring-accent
+                           transition-all placeholder:text-gray-400 shadow-sm"
               />
             </div>
 
             <button
               type="submit"
               disabled={!ingredients.trim() || loading}
-              className="w-full py-3 rounded-full bg-gradient-to-r from-accent to-dark
-                         text-white font-bold shadow-lg
+              className="w-full py-4 rounded-full bg-gradient-to-r from-accent to-dark
+                         text-white font-bold text-xl shadow-md
                          transition-transform duration-300 hover:scale-105
-                         focus:outline-none focus:ring-2 focus:ring-dark
-                         disabled:opacity-50"
+                         focus:outline-none focus:ring-4 focus:ring-dark
+                         disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Generating..." : "Generate Meal"}
+              {loading ? "Generating..." : "Generate Recipe"}
             </button>
           </form>
 
           {error && (
-            <p className="text-red-600 font-semibold text-center mt-6">{error}</p>
+            <p className="text-red-500 font-semibold text-center mt-6">{error}</p>
           )}
 
           {recipe && (
             <div
-              className="mt-10 p-6 bg-white rounded-xl shadow-md transition-transform
-                         duration-300 hover:scale-[1.02] hover:shadow-lg
-                         border border-gray-100"
+              className="mt-10 bg-white rounded-2xl shadow-lg p-8 transition-transform
+                         duration-300 hover:scale-[1.02] border border-gray-100"
               data-aos="fade-up"
             >
-              <h2 className="text-3xl font-bold text-accent mb-4 text-center">
+              <h2 className="text-4xl font-bold text-accent mb-6 text-center">
                 {recipe.mealName}
               </h2>
-              <div className="relative overflow-hidden rounded-xl mb-4">
+              <div className="relative overflow-hidden rounded-xl mb-6">
                 <img
                   src={recipe.image}
                   alt={recipe.mealName}
                   className="w-full h-auto object-cover
-                             transform hover:scale-110 transition-transform duration-500"
+                             transform hover:scale-105 transition-transform duration-500"
                 />
               </div>
-              <p className="text-dark leading-relaxed mb-2">
-                <strong>Ingredients Used:</strong>{" "}
-                {recipe.ingredientsUsed.join(", ")}
+              <p className="text-lg text-dark leading-relaxed mb-4">
+                <strong>Ingredients Used:</strong> {recipe.ingredientsUsed.join(", ")}
               </p>
-              <p className="text-dark/90 leading-relaxed whitespace-pre-wrap">
+              <p className="text-dark/90 leading-relaxed text-md whitespace-pre-wrap">
                 {recipe.recipeDetails}
               </p>
             </div>

@@ -24,7 +24,7 @@ public class OpenAIClient {
 
     public OpenAIClient(
             @Value("${openai.api.key}") String apiKey,
-            @Value("${openai.api.timeout:15}") int timeoutInSeconds) {
+            @Value("${openai.api.timeout:20}") int timeoutInSeconds) {
 
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalArgumentException("OpenAI API key is missing. Please configure it in application.yml.");
@@ -61,7 +61,7 @@ public class OpenAIClient {
                         Map.of("role", "system", "content", SYSTEM_MESSAGE),
                         Map.of("role", "user", "content", prompt)
                 ),
-                "max_tokens", 500,
+                "max_tokens", 2000,
                 "temperature", 1.0,
                 "top_p", 0.9,
                 "n", 1
