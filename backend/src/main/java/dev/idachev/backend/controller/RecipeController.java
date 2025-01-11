@@ -20,13 +20,15 @@ public class RecipeController {
     @PostMapping("/generate-meal")
     public ResponseEntity<?> generateMeal(@RequestBody Map<String, List<String>> request) {
         List<String> ingredients = request.get("ingredients");
+
         if (ingredients == null || ingredients.isEmpty()) {
             return ResponseEntity.badRequest().body("Ingredients list cannot be empty.");
         }
 
         try {
-            return ResponseEntity.ok(recipeService.generateMeal(ingredients));
-        } catch (Exception e) {
+            Map<String, Object> recipe = recipeService.generateMeal(ingredients);
+            return ResponseEntity.ok(recipe);
+        } catch (RuntimeException e) {
             return ResponseEntity.status(500).body(e.getMessage());
         }
     }

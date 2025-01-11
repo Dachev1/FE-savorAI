@@ -25,8 +25,4 @@ logging:
 openai:
   api:
     key: ${openai_api_key}
-    timeout: 30
-
-unsplash:
-  api:
-    key: ${unsplash_api_key}
+    timeout: 15

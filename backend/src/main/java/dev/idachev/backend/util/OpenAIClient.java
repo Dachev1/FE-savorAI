@@ -16,6 +16,7 @@ import java.util.Objects;
 public class OpenAIClient {
 
     private static final String BASE_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String IMAGE_GENERATION_URL = "https://api.openai.com/v1/images/generations";
     private static final String SYSTEM_MESSAGE = "You are a professional chef assistant. Generate a unique recipe for each request. Provide detailed step-by-step instructions and ensure the recipe is clear, creative, and complete.";
 
     private final WebClient webClient;
@@ -23,12 +24,13 @@ public class OpenAIClient {
 
     public OpenAIClient(
             @Value("${openai.api.key}") String apiKey,
-            @Value("${openai.api.timeout:30}") int timeoutInSeconds) {
+            @Value("${openai.api.timeout:15}") int timeoutInSeconds) {
 
-        Objects.requireNonNull(apiKey, "OpenAI API key is missing. Please configure it in application.yml.");
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalArgumentException("OpenAI API key is missing. Please configure it in application.yml.");
+        }
 
         this.webClient = WebClient.builder()
-                .baseUrl(BASE_URL)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
@@ -37,31 +39,54 @@ public class OpenAIClient {
     }
 
     public String getMealSuggestion(String prompt) {
+        Map<String, Object> requestBody = createChatRequestBody(prompt);
+
+        return executePostRequest(BASE_URL, requestBody, "Error fetching meal suggestion");
+    }
+
+    public String generateImage(String prompt) {
         Map<String, Object> requestBody = Map.of(
+                "prompt", prompt,
+                "n", 1,
+                "size", "256x256"
+        );
+
+        return executePostRequest(IMAGE_GENERATION_URL, requestBody, "Error generating image");
+    }
+
+    private Map<String, Object> createChatRequestBody(String prompt) {
+        return Map.of(
                 "model", "gpt-4",
                 "messages", List.of(
                         Map.of("role", "system", "content", SYSTEM_MESSAGE),
                         Map.of("role", "user", "content", prompt)
                 ),
-                "max_tokens", 500, // Increased to allow detailed instructions
-                "temperature", 1.0, // Increased for more creativity and variety
-                "top_p", 0.9, // Ensures responses are coherent
-                "n", 1 // Ensures one response is generated at a time
+                "max_tokens", 500,
+                "temperature", 1.0,
+                "top_p", 0.9,
+                "n", 1
         );
+    }
 
+    private String executePostRequest(String url, Map<String, Object> requestBody, String errorMessage) {
         try {
             return this.webClient.post()
+                    .uri(url)
                     .bodyValue(requestBody)
                     .retrieve()
                     .bodyToMono(String.class)
                     .timeout(this.timeout)
                     .block();
         } catch (WebClientResponseException e) {
-            String errorDetails = String.format("OpenAI API error - Status: %d, Body: %s",
-                    e.getRawStatusCode(), e.getResponseBodyAsString());
-            throw new RuntimeException(errorDetails, e);
+            logError(e);
+            throw new RuntimeException(String.format("%s - Status: %d, Body: %s",
+                    errorMessage, e.getRawStatusCode(), e.getResponseBodyAsString()), e);
         } catch (Exception e) {
-            throw new RuntimeException("Error fetching meal suggestion: " + e.getMessage(), e);
+            throw new RuntimeException(errorMessage + ": " + e.getMessage(), e);
         }
+    }
+
+    private void logError(WebClientResponseException e) {
+        System.err.printf("API Error - Status: %d, Body: %s%n", e.getRawStatusCode(), e.getResponseBodyAsString());
     }
 }
