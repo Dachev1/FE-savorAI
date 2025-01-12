@@ -39,9 +39,11 @@ const Home: React.FC = () => {
                         planning tools. The future of effortless cooking starts here!
                     </p>
                     <div className="flex flex-wrap gap-4 mt-4">
-                        <button className="px-8 py-3 bg-accent text-white font-semibold rounded-full shadow-lg hover:bg-dark hover:scale-105 transition-transform duration-300">
+                        <Link
+                            to="/signup"
+                            className="px-8 py-3 bg-accent text-white font-semibold rounded-full shadow-lg hover:bg-dark hover:scale-105 transition-transform duration-300">
                             Get Started
-                        </button>
+                        </Link>
                         <Link
                             to="/learn-more"
                             className="px-8 py-3 border border-accent text-accent font-bold rounded-full shadow-md hover:bg-accent hover:text-white hover:scale-110 transition-transform duration-300"

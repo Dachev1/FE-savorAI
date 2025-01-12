@@ -9,7 +9,7 @@ import LearnMore from "./pages/LearnMore";
 import Contact from "./pages/Contact";
 import About from "./pages/About";
 import Error from "./pages/Error";
-import Features from "./pages/Features";
+import RecipeGenerator from "./pages/RecipeGenerator";
 
 const App: React.FC = () => {
   return (
@@ -23,7 +23,7 @@ const App: React.FC = () => {
           <Route path="/learn-more" element={<LearnMore />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/about" element={<About />} />
-          <Route path="/features" element={<Features />} />
+          <Route path="/recipes/recipe-generator" element={<RecipeGenerator />} />
           <Route path="*" element={<Error />} />
         </Routes>
       </main>

@@ -14,7 +14,7 @@ const Error: React.FC = () => {
                 <div
                     className="absolute top-0 -right-6 bg-accent text-white rounded-full p-3 shadow-lg transform scale-105"
                 >
-                    <span className="text-4xl">🔥</span>
+                    <span className="text-4xl">404🔥</span>
                 </div>
             </div>
 
@@ -33,12 +33,6 @@ const Error: React.FC = () => {
                     className="px-8 py-3 bg-accent text-white font-bold rounded-full shadow-xl hover:bg-dark hover:scale-110 focus:ring-4 focus:ring-accent focus:ring-opacity-50 transition-transform duration-300"
                 >
                     Back to Home
-                </Link>
-                <Link
-                    to="/features"
-                    className="px-8 py-3 border-2 border-accent text-accent font-bold rounded-full shadow-md hover:bg-accent hover:text-white hover:scale-110 transition-transform duration-300"
-                >
-                    Explore Features
                 </Link>
             </div>
 
