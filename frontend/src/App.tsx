@@ -9,7 +9,7 @@ import LearnMore from "./pages/LearnMore";
 import Contact from "./pages/Contact";
 import About from "./pages/About";
 import Error from "./pages/Error";
-import RecipeGenerator from "./pages/RecipeGenerator";
+import RecipeGenerator from "./pages/Recipe/RecipeGenerator";
 
 const App: React.FC = () => {
   return (

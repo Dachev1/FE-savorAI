@@ -1,10 +1,13 @@
-package dev.idachev.backend.entity;
+package dev.idachev.backend.feedback.model;
 
+import dev.idachev.backend.user.model.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.UUID;
 
 @Entity
 @Table(name = "feedbacks")
@@ -12,15 +15,19 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Feedback extends BaseEntity {
+public class Feedback {
 
-    @Column( nullable = false, length = 1000)
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @Column(nullable = false, length = 1000)
     private String message;
 
     @Column(nullable = false)
-    private int rating; // Rating out of 5
+    private int rating;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(nullable = false)
     private User user;
 }

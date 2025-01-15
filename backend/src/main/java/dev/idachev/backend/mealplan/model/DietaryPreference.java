@@ -1,4 +1,4 @@
-package dev.idachev.backend.entity.enums;
+package dev.idachev.backend.mealplan.model;
 
 public enum DietaryPreference {
     VEGAN,

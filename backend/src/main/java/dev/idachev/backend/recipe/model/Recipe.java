@@ -1,7 +1,5 @@
-package dev.idachev.backend.entity;
+package dev.idachev.backend.recipe.model;
 
-import dev.idachev.backend.entity.enums.CuisineType;
-import dev.idachev.backend.entity.enums.Difficulty;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.Set;
+import java.util.UUID;
 
 @Entity
 @Table(name = "recipes")
@@ -16,7 +15,11 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Recipe extends BaseEntity {
+public class Recipe {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     @Column(nullable = false)
     private String title;
@@ -25,11 +28,11 @@ public class Recipe extends BaseEntity {
     private String description;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "cuisine_type", nullable = false)
+    @Column(nullable = false)
     private CuisineType cuisineType;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "difficulty", nullable = false)
+    @Column(nullable = false)
     private Difficulty difficulty;
 
     @ElementCollection
@@ -37,9 +40,9 @@ public class Recipe extends BaseEntity {
     @Column(name = "ingredient", nullable = false)
     private Set<String> ingredients;
 
-    @Column(name = "cooking_time_minutes", nullable = false)
+    @Column(nullable = false)
     private Integer cookingTime;
 
-    @Column(name = "created_by", nullable = false)
+    @Column(nullable = false)
     private Long createdBy;
 }

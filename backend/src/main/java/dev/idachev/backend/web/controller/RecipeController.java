@@ -1,6 +1,6 @@
-package dev.idachev.backend.controller;
+package dev.idachev.backend.web.controller;
 
-import dev.idachev.backend.service.RecipeService;
+import dev.idachev.backend.recipe.service.RecipeService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

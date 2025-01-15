@@ -1,11 +1,12 @@
-package dev.idachev.backend.entity;
+package dev.idachev.backend.user.model;
 
-import dev.idachev.backend.entity.enums.RoleType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.UUID;
 
 @Entity
 @Table(name = "users")
@@ -13,7 +14,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class User extends BaseEntity {
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     @Column(nullable = false, unique = true)
     private String email;
@@ -21,13 +26,13 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private String password;
 
-    @Column(name = "full_name", nullable = false)
+    @Column(nullable = false)
     private String fullName;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
+    @Column(nullable = false)
     private RoleType role;
 
-    @Column(name = "is_enabled", nullable = false)
+    @Column(nullable = false)
     private boolean isEnabled = true;
 }

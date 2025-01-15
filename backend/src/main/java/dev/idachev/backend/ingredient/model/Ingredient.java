@@ -1,12 +1,12 @@
-package dev.idachev.backend.entity;
+package dev.idachev.backend.ingredient.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.UUID;
 
 @Entity
 @Table(name = "ingredients")
@@ -14,14 +14,18 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Ingredient extends BaseEntity {
+public class Ingredient {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     @Column(nullable = false, unique = true)
     private String name;
 
-    @Column(name = "calories_per_100g", nullable = false)
+    @Column(nullable = false)
     private double calories;
 
-    @Column(name = "is_vegan", nullable = false)
+    @Column(nullable = false)
     private boolean isVegan;
 }

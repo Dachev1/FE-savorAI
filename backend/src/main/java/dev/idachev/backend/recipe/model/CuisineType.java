@@ -1,4 +1,4 @@
-package dev.idachev.backend.entity.enums;
+package dev.idachev.backend.recipe.model;
 
 public enum CuisineType {
     ITALIAN,

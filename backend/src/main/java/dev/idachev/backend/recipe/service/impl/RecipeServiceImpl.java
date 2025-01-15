@@ -1,8 +1,8 @@
-package dev.idachev.backend.service.impl;
+package dev.idachev.backend.recipe.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.idachev.backend.service.RecipeService;
+import dev.idachev.backend.recipe.service.RecipeService;
 import dev.idachev.backend.util.OpenAIClient;
 import org.springframework.stereotype.Service;
 

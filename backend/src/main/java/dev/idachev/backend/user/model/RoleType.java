@@ -1,4 +1,4 @@
-package dev.idachev.backend.entity.enums;
+package dev.idachev.backend.user.model;
 
 public enum RoleType {
     USER,

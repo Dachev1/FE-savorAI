@@ -1,4 +1,4 @@
-package dev.idachev.backend.service;
+package dev.idachev.backend.recipe.service;
 
 import java.util.List;
 import java.util.Map;

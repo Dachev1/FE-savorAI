@@ -1,6 +1,6 @@
-package dev.idachev.backend.entity;
+package dev.idachev.backend.mealplan.model;
 
-import dev.idachev.backend.entity.enums.DietaryPreference;
+import dev.idachev.backend.user.model.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Entity
 @Table(name = "meal_plans")
@@ -15,22 +16,26 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MealPlan extends BaseEntity {
+public class MealPlan {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "dietary_preference", nullable = false)
+    @Column(nullable = false)
     private DietaryPreference dietaryPreference;
 
-    @Column(name = "start_date", nullable = false)
+    @Column(nullable = false)
     private LocalDate startDate;
 
-    @Column(name = "end_date", nullable = false)
+    @Column(nullable = false)
     private LocalDate endDate;
 
     @Column(length = 500)
     private String description;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(nullable = false)
     private User user;
 }
