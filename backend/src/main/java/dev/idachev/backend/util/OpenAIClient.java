@@ -1,6 +1,6 @@
 package dev.idachev.backend.util;
 
-import org.springframework.beans.factory.annotation.Value;
+import dev.idachev.backend.util.property.OpenAIClientProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -15,50 +15,50 @@ import java.util.Objects;
 @Component
 public class OpenAIClient {
 
-    private static final String BASE_URL = "https://api.openai.com/v1/chat/completions";
-    private static final String IMAGE_GENERATION_URL = "https://api.openai.com/v1/images/generations";
-    private static final String SYSTEM_MESSAGE = "You are a professional chef assistant. Generate a unique recipe for each request. Provide detailed step-by-step instructions and ensure the recipe is clear, creative, and complete.";
-
     private final WebClient webClient;
-    private final Duration timeout;
+    private final Duration requestTimeout;
+    private final String chatCompletionUrl;
+    private final String imageGenerationUrl;
+    private final String systemMessage;
 
-    public OpenAIClient(
-            @Value("${openai.api.key}") String apiKey,
-            @Value("${openai.api.timeout:20}") int timeoutInSeconds) {
+    public OpenAIClient(final OpenAIClientProperty property) {
+        Objects.requireNonNull(property, "OpenAIClientProperty cannot be null.");
+        Objects.requireNonNull(property.getApiKey(), "OpenAI API key is missing. Please configure it in application.yml or environment variables.");
 
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalArgumentException("OpenAI API key is missing. Please configure it in application.yml.");
+        if (property.getApiKey().isBlank()) {
+            throw new IllegalArgumentException("OpenAI API key is blank. Please configure it in application.yml.");
         }
 
         this.webClient = WebClient.builder()
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + property.getApiKey())
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
 
-        this.timeout = Duration.ofSeconds(timeoutInSeconds);
+        this.requestTimeout = Duration.ofSeconds(property.getApiTimeout());
+        this.chatCompletionUrl = property.getBaseUrl();
+        this.imageGenerationUrl = property.getImageGenerationUrl();
+        this.systemMessage = property.getSystemMessage();
     }
 
-    public String getMealSuggestion(String prompt) {
-        Map<String, Object> requestBody = createChatRequestBody(prompt);
-
-        return executePostRequest(BASE_URL, requestBody, "Error fetching meal suggestion");
+    public String getMealSuggestion(final String prompt) {
+        Map<String, Object> chatRequest = buildChatCompletionRequest(prompt);
+        return performPostRequest(chatCompletionUrl, chatRequest, "Error fetching meal suggestion");
     }
 
-    public String generateImage(String prompt) {
-        Map<String, Object> requestBody = Map.of(
+    public String generateImage(final String prompt) {
+        Map<String, Object> imageRequest = Map.of(
                 "prompt", prompt,
                 "n", 1,
                 "size", "256x256"
         );
-
-        return executePostRequest(IMAGE_GENERATION_URL, requestBody, "Error generating image");
+        return performPostRequest(imageGenerationUrl, imageRequest, "Error generating image");
     }
 
-    private Map<String, Object> createChatRequestBody(String prompt) {
+    private Map<String, Object> buildChatCompletionRequest(final String prompt) {
         return Map.of(
                 "model", "gpt-4",
                 "messages", List.of(
-                        Map.of("role", "system", "content", SYSTEM_MESSAGE),
+                        Map.of("role", "system", "content", systemMessage),
                         Map.of("role", "user", "content", prompt)
                 ),
                 "max_tokens", 2000,
@@ -68,25 +68,23 @@ public class OpenAIClient {
         );
     }
 
-    private String executePostRequest(String url, Map<String, Object> requestBody, String errorMessage) {
+    private String performPostRequest(final String url, final Map<String, Object> requestBody, final String errorMessage) {
         try {
-            return this.webClient.post()
+            return webClient.post()
                     .uri(url)
                     .bodyValue(requestBody)
                     .retrieve()
                     .bodyToMono(String.class)
-                    .timeout(this.timeout)
+                    .timeout(requestTimeout)
                     .block();
         } catch (WebClientResponseException e) {
-            logError(e);
-            throw new RuntimeException(String.format("%s - Status: %d, Body: %s",
-                    errorMessage, e.getRawStatusCode(), e.getResponseBodyAsString()), e);
+            System.err.printf("API Error - Status: %d, Body: %s%n", e.getRawStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException(
+                    String.format("%s - Status: %d, Body: %s", errorMessage, e.getRawStatusCode(), e.getResponseBodyAsString()),
+                    e
+            );
         } catch (Exception e) {
             throw new RuntimeException(errorMessage + ": " + e.getMessage(), e);
         }
-    }
-
-    private void logError(WebClientResponseException e) {
-        System.err.printf("API Error - Status: %d, Body: %s%n", e.getRawStatusCode(), e.getResponseBodyAsString());
     }
 }

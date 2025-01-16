@@ -23,6 +23,8 @@ logging:
     org.hibernate.SQL: debug
 
 openai:
-  api:
-    key: ${openai_api_key}
-    timeout: 20
+  apiKey: ${openai_api_key}
+  apiTimeout: 20
+  baseUrl: https://api.openai.com/v1/chat/completions
+  imageGenerationUrl: https://api.openai.com/v1/images/generations
+  systemMessage: "You are a professional chef assistant. Generate a unique recipe for each request. Provide detailed step-by-step instructions and ensure the recipe is clear, creative, and complete."

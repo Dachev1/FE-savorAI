@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import AOS from "aos";
 import "aos/dist/aos.css";
-import axios from "../api/axiosConfig";
+import axios from "../../api/axiosConfig";
 
 interface RecipeResponse {
   image: string;
