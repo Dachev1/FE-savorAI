@@ -1,6 +1,6 @@
 package dev.idachev.backend.user.model;
 
-public enum RoleType {
+public enum Role {
     USER,
     ADMIN
 }

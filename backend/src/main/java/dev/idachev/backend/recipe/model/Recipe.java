@@ -1,20 +1,22 @@
 package dev.idachev.backend.recipe.model;
 
+import dev.idachev.backend.user.model.User;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-@Entity
-@Table(name = "recipes")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Entity
+@Table(name = "recipes")
+
 public class Recipe {
 
     @Id
@@ -24,25 +26,17 @@ public class Recipe {
     @Column(nullable = false)
     private String title;
 
-    @Column(nullable = false, length = 500)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private CuisineType cuisineType;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Difficulty difficulty;
 
     @ElementCollection
     @CollectionTable(name = "recipe_ingredients", joinColumns = @JoinColumn(name = "recipe_id"))
-    @Column(name = "ingredient", nullable = false)
-    private Set<String> ingredients;
+    @Column(name = "ingredient")
+    private List<String> ingredients = new ArrayList<>();
 
-    @Column(nullable = false)
-    private Integer cookingTime;
+    private boolean aiGenerated;
 
-    @Column(nullable = false)
-    private Long createdBy;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
 }
