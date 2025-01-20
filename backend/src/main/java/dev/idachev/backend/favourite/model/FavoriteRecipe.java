@@ -1,4 +1,4 @@
-package dev.idachev.backend.favorite.model;
+package dev.idachev.backend.favourite.model;
 
 import dev.idachev.backend.recipe.model.Recipe;
 import dev.idachev.backend.user.model.User;
