@@ -5,7 +5,6 @@ import lombok.*;
 
 import java.util.UUID;
 
-
 @Getter
 @Setter
 @NoArgsConstructor
@@ -33,10 +32,6 @@ public class User {
     private Role role;
 
     private boolean isActive = true;
-
-    // For future email verification
     private boolean emailVerified = false;
-
-    // User avatar file path or URL
     private String avatarPath;
 }

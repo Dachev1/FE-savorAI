@@ -15,7 +15,6 @@ import java.util.UUID;
 @Builder
 @Entity
 @Table(name = "recipes")
-
 public class Recipe {
 
     @Id

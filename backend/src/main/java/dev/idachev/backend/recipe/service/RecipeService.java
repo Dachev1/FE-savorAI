@@ -20,46 +20,51 @@ public class RecipeService {
     }
 
     public Map<String, Object> generateMeal(List<String> ingredients) {
-        validateIngredients(ingredients);
+        validateIngredientsNotEmpty(ingredients);
+        String prompt = buildMealSuggestionPrompt(ingredients);
 
-        String prompt = createPrompt(ingredients);
-        String aiResponse = openAIClient.getMealSuggestion(prompt);
-        return parseRecipe(aiResponse, ingredients);
+        String openAiResponse = openAIClient.getMealSuggestion(prompt);
+        return extractRecipeFromAiResponse(openAiResponse, ingredients);
     }
 
-    private void validateIngredients(List<String> ingredients) {
+    private void validateIngredientsNotEmpty(List<String> ingredients) {
         if (ingredients == null || ingredients.isEmpty()) {
             throw new IllegalArgumentException("Ingredients list cannot be empty.");
         }
     }
 
-    private String createPrompt(List<String> ingredients) {
+    private String buildMealSuggestionPrompt(List<String> ingredients) {
         return "Generate a unique recipe using the following ingredients: " +
                 String.join(", ", ingredients) +
                 ". Provide a detailed step-by-step guide and a recipe name.";
     }
 
-    private Map<String, Object> parseRecipe(String aiResponse, List<String> ingredients) {
+    private Map<String, Object> extractRecipeFromAiResponse(String response, List<String> ingredients) {
         try {
-            JsonNode rootNode = objectMapper.readTree(aiResponse);
-            String content = rootNode.path("choices").get(0).path("message").path("content").asText();
+            JsonNode rootNode = objectMapper.readTree(response);
+            String content = rootNode
+                    .path("choices")
+                    .get(0)
+                    .path("message")
+                    .path("content")
+                    .asText();
 
             String[] lines = content.split("\n", 2);
             String mealName = lines[0].trim().replace("Recipe: ", "");
-            String recipeDetails = lines.length > 1 ? lines[1].trim() : "";
+            String recipeDetails = (lines.length > 1) ? lines[1].trim() : "";
 
             return Map.of(
                     "mealName", mealName,
                     "ingredientsUsed", ingredients,
-                    "image", generateImage(mealName),
+                    "imageUrl", generateMealImageUrl(mealName),
                     "recipeDetails", recipeDetails
             );
         } catch (Exception e) {
-            throw new RuntimeException("Failed to parse recipe from OpenAI response: " + e.getMessage());
+            throw new RuntimeException("Failed to parse recipe from OpenAI response: " + e.getMessage(), e);
         }
     }
 
-    private String generateImage(String mealName) {
+    private String generateMealImageUrl(String mealName) {
         try {
             String prompt = "A professional, high-quality photo of a delicious " + mealName + " dish.";
             String aiImageResponse = openAIClient.generateImage(prompt);
@@ -67,7 +72,7 @@ public class RecipeService {
             JsonNode rootNode = objectMapper.readTree(aiImageResponse);
             return rootNode.path("data").get(0).path("url").asText();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to generate image: " + e.getMessage());
+            throw new RuntimeException("Failed to generate image: " + e.getMessage(), e);
         }
     }
 }

@@ -28,3 +28,10 @@ openai:
   baseUrl: https://api.openai.com/v1/chat/completions
   imageGenerationUrl: https://api.openai.com/v1/images/generations
   systemMessage: "You are a professional chef assistant. Generate a unique recipe for each request. Provide detailed step-by-step instructions and ensure the recipe is clear, creative, and complete."
+  modelName: "gpt-4"
+  maxTokens: 2000
+  temperature: 1.0
+  topP: 0.9
+  choicesCount: 1
+  imageCount: 1
+  imageSize: "256x256"
