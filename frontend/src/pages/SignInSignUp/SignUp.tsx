@@ -1,4 +1,6 @@
+// src/pages/SignInSignUp/SignUp.tsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 
@@ -51,6 +53,9 @@ const SignUp: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<IFormErrors>({});
 
+  // For navigation
+  const navigate = useNavigate();
+
   // AOS Initialization
   useEffect(() => {
     AOS.init({ duration: 800, once: true });
@@ -64,8 +69,9 @@ const SignUp: React.FC = () => {
     setErrors(formErrors);
 
     if (Object.keys(formErrors).length === 0) {
-      console.log('Sign Up Successful');
-      // Add sign-up logic here (e.g., API request)
+      // Suppose your sign-up logic or API call was successful,
+      // then navigate to "/registration-success" with the username in state
+      navigate('/registration-success', { state: { username } });
     }
   };
 
@@ -152,8 +158,7 @@ const SignUpForm: React.FC<SignUpFormProps> = ({
 }) => (
   <form
     className="space-y-6"
-    // Prevent default form submission to allow custom handling
-    onSubmit={(e) => e.preventDefault()}
+    onSubmit={(e) => e.preventDefault()} // Prevent default form submission
   >
     {/* Username Field */}
     <div>
