@@ -27,7 +27,7 @@ public class Macros {
 
     private Double fat;
 
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "recipe_id", unique = true)
+    @OneToOne(optional = false)
+    @JoinColumn(unique = true)
     private Recipe recipe;
 }

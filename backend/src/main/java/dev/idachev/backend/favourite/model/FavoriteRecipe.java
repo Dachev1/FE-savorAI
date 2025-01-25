@@ -22,16 +22,12 @@ public class FavoriteRecipe {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id")
+    @ManyToOne(optional = false)
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "recipe_id")
+    @ManyToOne(optional = false)
     private Recipe recipe;
 
     @ElementCollection
-    @CollectionTable(name = "favorite_recipe_ingredients", joinColumns = @JoinColumn(name = "favorite_id"))
-    @Column(name = "ingredient")
     private List<String> customIngredients = new ArrayList<>();
 }

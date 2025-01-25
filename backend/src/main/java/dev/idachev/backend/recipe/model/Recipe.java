@@ -28,24 +28,16 @@ public class Recipe {
     private String description;
 
     @ElementCollection
-    @CollectionTable(name = "recipe_ingredients", joinColumns = @JoinColumn(name = "recipe_id"))
-    @Column(name = "ingredient")
     private List<String> ingredients = new ArrayList<>();
 
     private boolean aiGenerated;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by")
+    @ManyToOne
     private User createdBy;
 
     @OneToOne(mappedBy = "recipe", cascade = CascadeType.ALL)
     private Macros macros;
 
     @ManyToMany
-    @JoinTable(
-            name = "recipe_allergies",
-            joinColumns = @JoinColumn(name = "recipe_id"),
-            inverseJoinColumns = @JoinColumn(name = "allergy_id")
-    )
     private Set<Allergy> allergies = new HashSet<>();
 }

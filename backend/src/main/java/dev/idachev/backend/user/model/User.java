@@ -41,10 +41,5 @@ public class User {
     private String avatarPath;
 
     @ManyToMany
-    @JoinTable(
-            name = "user_allergies",
-            joinColumns = @JoinColumn(name = "user_id"),
-            inverseJoinColumns = @JoinColumn(name = "allergy_id")
-    )
     private Set<Allergy> allergies = new HashSet<>();
 }
