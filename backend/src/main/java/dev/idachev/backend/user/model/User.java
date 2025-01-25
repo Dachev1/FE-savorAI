@@ -1,8 +1,11 @@
 package dev.idachev.backend.user.model;
 
+import dev.idachev.backend.allergy.model.Allergy;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Getter
@@ -32,6 +35,16 @@ public class User {
     private Role role;
 
     private boolean isActive = true;
+
     private boolean emailVerified = false;
+
     private String avatarPath;
+
+    @ManyToMany
+    @JoinTable(
+            name = "user_allergies",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "allergy_id")
+    )
+    private Set<Allergy> allergies = new HashSet<>();
 }
