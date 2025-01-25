@@ -11,6 +11,7 @@ export const NAV_ITEMS = {
     userLinks: [
       { name: 'Profile Settings', path: '/user/profile' },
       { name: 'My Favorites', path: '/user/favorites' },
+      { name: 'Manage Allergens', path: '/allergen-setup' },
     ],
   };
   

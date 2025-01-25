@@ -13,6 +13,7 @@ import RecipeGenerator from './pages/Recipe/RecipeGenerator';
 import RecipeCreate from './pages/Recipe/RecipeCreate';
 import Error from './pages/Error';
 import RegistrationSuccess from './pages/SignInSignUp/RegistrationSuccess';
+import AllergenSetup from './pages/AllergenSetup'
 
 const App: React.FC = () => {
   return (
@@ -27,6 +28,7 @@ const App: React.FC = () => {
           <Route path="/learn-more" element={<LearnMore />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/about" element={<About />} />
+          <Route path="/allergen-setup" element={<AllergenSetup />} />
           <Route path="/recipes/recipe-generator" element={<RecipeGenerator />} />
           <Route path="/recipes/create" element={<RecipeCreate />} />
           <Route path="*" element={<Error />} />

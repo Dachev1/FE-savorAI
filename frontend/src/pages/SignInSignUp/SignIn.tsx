@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 
@@ -15,6 +16,9 @@ const SignIn: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
+
+  // For navigation after successful sign-in
+  const navigate = useNavigate();
 
   // Initialize AOS
   useEffect(() => {
@@ -34,6 +38,7 @@ const SignIn: React.FC = () => {
 
     // Replace with real sign-in logic (API calls, etc.)
     console.log('Sign In Successful');
+    navigate('/'); // Redirect to homepage or another route
   };
 
   return (
@@ -104,59 +109,57 @@ const SignInForm: React.FC<SignInFormProps> = ({
   password,
   setPassword,
   onSignIn,
-}) => {
-  return (
-    <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
-      {/* Email Field */}
-      <div>
-        <label
-          htmlFor="email"
-          className={`block text-sm font-medium ${email ? 'text-accent' : 'text-secondary'}`}
-        >
-          Email
-        </label>
-        <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className={`mt-1 w-full px-4 py-3 rounded-lg border ${
-            emailError ? 'border-red-500' : 'border-gray-300'
-          } shadow-sm`}
-          placeholder="Enter your email"
-        />
-        {emailError && <p className="mt-2 text-sm text-red-500">{emailError}</p>}
-      </div>
-
-      {/* Password Field */}
-      <div>
-        <label
-          htmlFor="password"
-          className={`block text-sm font-medium ${password ? 'text-accent' : 'text-secondary'}`}
-        >
-          Password
-        </label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="mt-1 w-full px-4 py-3 rounded-lg border border-gray-300 shadow-sm"
-          placeholder="Enter your password"
-        />
-      </div>
-
-      {/* Sign In Button */}
-      <button
-        type="button"
-        onClick={onSignIn}
-        className="w-full py-3 bg-accent text-white font-semibold rounded-lg shadow-lg hover:bg-dark transition-transform"
+}) => (
+  <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+    {/* Email Field */}
+    <div>
+      <label
+        htmlFor="email"
+        className={`block text-sm font-medium ${email ? 'text-accent' : 'text-secondary'}`}
       >
-        Sign In
-      </button>
-    </form>
-  );
-};
+        Email
+      </label>
+      <input
+        id="email"
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className={`mt-1 w-full px-4 py-3 rounded-lg border ${
+          emailError ? 'border-red-500' : 'border-gray-300'
+        } shadow-sm`}
+        placeholder="Enter your email"
+      />
+      {emailError && <p className="mt-2 text-sm text-red-500">{emailError}</p>}
+    </div>
+
+    {/* Password Field */}
+    <div>
+      <label
+        htmlFor="password"
+        className={`block text-sm font-medium ${password ? 'text-accent' : 'text-secondary'}`}
+      >
+        Password
+      </label>
+      <input
+        id="password"
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        className="mt-1 w-full px-4 py-3 rounded-lg border border-gray-300 shadow-sm"
+        placeholder="Enter your password"
+      />
+    </div>
+
+    {/* Sign In Button */}
+    <button
+      type="button"
+      onClick={onSignIn}
+      className="w-full py-3 bg-accent text-white font-semibold rounded-lg shadow-lg hover:bg-dark transition-transform"
+    >
+      Sign In
+    </button>
+  </form>
+);
 
 /** ------------------------------------------------------------------
  *  Subcomponent: SignUpRedirect
