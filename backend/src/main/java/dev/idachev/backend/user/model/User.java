@@ -1,6 +1,6 @@
 package dev.idachev.backend.user.model;
 
-import dev.idachev.backend.allergy.model.Allergy;
+import dev.idachev.backend.аllergen.model.Allergen;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -41,5 +41,5 @@ public class User {
     private String avatarPath;
 
     @ManyToMany
-    private Set<Allergy> allergies = new HashSet<>();
+    private Set<Allergen> allergies = new HashSet<>();
 }

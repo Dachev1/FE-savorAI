@@ -1,6 +1,6 @@
 package dev.idachev.backend.recipe.model;
 
-import dev.idachev.backend.allergy.model.Allergy;
+import dev.idachev.backend.аllergen.model.Allergen;
 import dev.idachev.backend.macros.model.Macros;
 import dev.idachev.backend.user.model.User;
 import jakarta.persistence.*;
@@ -39,5 +39,5 @@ public class Recipe {
     private Macros macros;
 
     @ManyToMany
-    private Set<Allergy> allergies = new HashSet<>();
+    private Set<Allergen> allergies = new HashSet<>();
 }

@@ -1,4 +1,4 @@
-package dev.idachev.backend.allergy.model;
+package dev.idachev.backend.аllergen.model;
 
 import dev.idachev.backend.recipe.model.Recipe;
 import dev.idachev.backend.user.model.User;
@@ -15,8 +15,8 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "allergies")
-public class Allergy {
+@Table(name = "allergens")
+public class Allergen {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
