@@ -1,4 +1,4 @@
-package dev.idachev.backend.web.controller;
+package dev.idachev.backend.web;
 
 import dev.idachev.backend.recipe.service.RecipeService;
 import org.springframework.http.HttpStatus;
