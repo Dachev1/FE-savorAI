@@ -1,11 +1,12 @@
 package dev.idachev.backend.web.dto;
 
 import jakarta.validation.constraints.NotEmpty;
+import lombok.Data;
 
 import java.util.List;
 
-public record GenerateMealRequest(
+@Data
+public class GenerateMealRequest {
         @NotEmpty(message = "Ingredients list cannot be empty.")
-        List<String> ingredients
-) {
+        private List<String> ingredients;
 }

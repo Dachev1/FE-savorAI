@@ -2,12 +2,11 @@ package dev.idachev.backend.web;
 
 import dev.idachev.backend.recipe.service.RecipeService;
 import dev.idachev.backend.web.dto.GenerateMealRequest;
+import dev.idachev.backend.web.dto.GeneratedMealResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/recipes")
@@ -21,10 +20,10 @@ public class RecipeController {
     }
 
     @PostMapping("/generate-meal")
-    public ResponseEntity<Map<String, Object>> generateMealFromIngredients(
+    public ResponseEntity<GeneratedMealResponse> generateMealFromIngredients(
             @Valid @RequestBody GenerateMealRequest request
     ) {
-        Map<String, Object> generatedMeal = recipeService.generateMeal(request.ingredients());
+        GeneratedMealResponse generatedMeal = recipeService.generateMeal(request.getIngredients());
         return ResponseEntity.ok(generatedMeal);
     }
 }

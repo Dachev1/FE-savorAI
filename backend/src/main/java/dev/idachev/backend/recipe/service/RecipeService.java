@@ -4,11 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.idachev.backend.exception.InvalidIngredientsException;
 import dev.idachev.backend.util.OpenAIClient;
+import dev.idachev.backend.web.dto.GeneratedMealResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class RecipeService {
@@ -16,7 +16,7 @@ public class RecipeService {
     private final OpenAIClient openAIClient;
     private final ObjectMapper objectMapper;
 
-  @Autowired
+    @Autowired
     public RecipeService(OpenAIClient openAIClient, ObjectMapper objectMapper) {
         this.openAIClient = openAIClient;
         this.objectMapper = objectMapper;
@@ -26,9 +26,9 @@ public class RecipeService {
      * Generates a meal based on the provided list of ingredients.
      *
      * @param ingredients the list of ingredients for meal generation
-     * @return a map containing the generated meal details
+     * @return a GeneratedMealResponse containing the generated meal details
      */
-    public Map<String, Object> generateMeal(List<String> ingredients) {
+    public GeneratedMealResponse generateMeal(List<String> ingredients) {
         validateIngredients(ingredients);
         String prompt = buildPrompt(ingredients);
 
@@ -48,7 +48,7 @@ public class RecipeService {
                 ". Provide a detailed step-by-step guide and a recipe name.";
     }
 
-    private Map<String, Object> parseRecipe(String response, List<String> ingredients) {
+    private GeneratedMealResponse parseRecipe(String response, List<String> ingredients) {
         try {
             JsonNode rootNode = objectMapper.readTree(response);
             String content = rootNode
@@ -62,11 +62,7 @@ public class RecipeService {
             String mealName = lines[0].replace("Recipe: ", "").trim();
             String recipeDetails = (lines.length > 1) ? lines[1].trim() : "";
 
-            return Map.of(
-                    "mealName", mealName,
-                    "ingredientsUsed", ingredients,
-                    "recipeDetails", recipeDetails
-            );
+            return new GeneratedMealResponse(mealName, ingredients, recipeDetails);
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse recipe from response.", e);
         }
