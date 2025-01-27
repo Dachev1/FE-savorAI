@@ -7,7 +7,7 @@ import axios from '../../api/axiosConfig';
 // Types & Interfaces
 // -----------------------------------------------
 interface RecipeResponse {
-  image: string;
+  image: string; // Frontend expects 'image'
   ingredientsUsed: string[];
   mealName: string;
   recipeDetails: string;
@@ -45,12 +45,27 @@ const Features: React.FC = () => {
       .filter(Boolean);
 
     try {
-      const response = await axios.post<RecipeResponse>(
+      const response = await axios.post<{
+        mealName: string;
+        ingredientsUsed: string[];
+        recipeDetails: string;
+        imageUrl: string;
+      }>(
         '/recipes/generate-meal',
         { ingredients: ingredientsArray }
       );
-      setRecipe(response.data);
-    } catch {
+
+      // Map the backend response to match the frontend interface
+      const mappedRecipe: RecipeResponse = {
+        image: response.data.imageUrl, // Mapping 'imageUrl' to 'image'
+        ingredientsUsed: response.data.ingredientsUsed,
+        mealName: response.data.mealName,
+        recipeDetails: response.data.recipeDetails,
+      };
+
+      setRecipe(mappedRecipe);
+    } catch (err) {
+      console.error(err);
       setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
@@ -224,7 +239,7 @@ const RecipeCard: React.FC<RecipeCardProps> = ({
 
       <div className="relative overflow-hidden rounded-xl mb-6">
         <img
-          src={recipe.image}
+          src={recipe.image} // Uses the mapped 'image' field
           alt={recipe.mealName}
           className="w-full h-auto object-cover
                      transform hover:scale-105 transition-transform duration-500"
