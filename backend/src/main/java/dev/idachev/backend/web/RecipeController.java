@@ -23,7 +23,7 @@ public class RecipeController {
     public ResponseEntity<GeneratedMealResponse> generateMealFromIngredients(
             @Valid @RequestBody GenerateMealRequest request
     ) {
-        GeneratedMealResponse generatedMeal = recipeService.generateMeal(request.getIngredients());
+        GeneratedMealResponse generatedMeal = recipeService.generateMeal(request.ingredients());
         return ResponseEntity.ok(generatedMeal);
     }
 }
