@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 @Service
-public class RecipeService implements IRecipeService {
+public class RecipeService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RecipeService.class);
     private static final Pattern VALID_INGREDIENT_PATTERN = Pattern.compile("^[a-zA-Z\\s]+$");
@@ -32,7 +32,7 @@ public class RecipeService implements IRecipeService {
      * @param ingredients the list of ingredients for meal generation
      * @return a GeneratedMealResponse containing the generated meal details and image URL
      */
-    @Override
+    
     public GeneratedMealResponse generateMeal(List<String> ingredients) {
         LOGGER.info("Generating meal with ingredients: {}", ingredients);
         validateIngredients(ingredients);
