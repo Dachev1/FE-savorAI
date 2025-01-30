@@ -13,9 +13,8 @@ import java.util.regex.Pattern;
 
 @Service
 public class RecipeService {
-
     private static final Logger LOGGER = LoggerFactory.getLogger(RecipeService.class);
-    private static final Pattern VALID_INGREDIENT_PATTERN = Pattern.compile("^[a-zA-Z\\s]+$");
+    private static final Pattern INGREDIENT_PATTERN = Pattern.compile(RecipeServiceConstants.VALID_INGREDIENT_REGEX);
 
     private final OpenAIClient openAIClient;
     private final RecipeResponseParser recipeResponseParser;
@@ -26,56 +25,46 @@ public class RecipeService {
         this.recipeResponseParser = recipeResponseParser;
     }
 
-    /**
-     * Generates a meal based on the provided list of ingredients.
-     *
-     * @param ingredients the list of ingredients for meal generation
-     * @return a GeneratedMealResponse containing the generated meal details and image URL
-     */
-    
     public GeneratedMealResponse generateMeal(List<String> ingredients) {
-        LOGGER.info("Generating meal with ingredients: {}", ingredients);
+        LOGGER.debug("Generating meal for ingredients: {}", ingredients);
         validateIngredients(ingredients);
-        String recipePrompt = buildRecipePrompt(ingredients);
 
-        LOGGER.debug("Recipe prompt: {}", recipePrompt);
-        String recipeResponse = openAIClient.getMealSuggestion(recipePrompt);
-        LOGGER.debug("Received recipe response: {}", recipeResponse);
-        GeneratedMealResponse mealResponse = recipeResponseParser.parseRecipeResponse(recipeResponse, ingredients);
+        final String recipePrompt = buildRecipePrompt(ingredients);
+        final String recipeResponse = openAIClient.getMealSuggestion(recipePrompt);
+        final GeneratedMealResponse mealResponse = recipeResponseParser.parseRecipeResponse(recipeResponse, ingredients);
 
-        String imagePrompt = buildImagePrompt(mealResponse.mealName());
-        LOGGER.debug("Image prompt: {}", imagePrompt);
-        String imageResponse = openAIClient.generateImage(imagePrompt);
-        LOGGER.debug("Received image response: {}", imageResponse);
-        String imageUrl = recipeResponseParser.extractImageUrl(imageResponse);
-
-        LOGGER.info("Generated image URL: {}", imageUrl);
-        GeneratedMealResponse finalResponse = buildGeneratedMealResponse(mealResponse, imageUrl);
-        LOGGER.info("Meal generation completed: {}", finalResponse.mealName());
-
-        return finalResponse;
+        return buildFinalResponse(mealResponse, generateMealImage(mealResponse.mealName()));
     }
 
     private void validateIngredients(List<String> ingredients) {
         if (ingredients == null || ingredients.isEmpty()) {
-            LOGGER.warn("Validation failed: Ingredients list is empty or null.");
             throw new InvalidIngredientsException(RecipeServiceConstants.INVALID_INGREDIENTS_MESSAGE);
         }
 
-        for (String ingredient : ingredients) {
-            if (ingredient == null || ingredient.trim().isEmpty()) {
-                LOGGER.warn("Validation failed: Ingredient is null or empty.");
-                throw new InvalidIngredientsException("Ingredient names cannot be null or empty.");
-            }
-            if (!VALID_INGREDIENT_PATTERN.matcher(ingredient).matches()) {
-                LOGGER.warn("Validation failed: Ingredient '{}' contains invalid characters.", ingredient);
-                throw new InvalidIngredientsException(
-                        String.format("Ingredient '%s' contains invalid characters.", ingredient)
-                );
-            }
+        ingredients.forEach(this::validateIngredientFormat);
+    }
+
+    private void validateIngredientFormat(String ingredient) {
+        if (ingredient == null || ingredient.isBlank()) {
+            throw new InvalidIngredientsException(RecipeServiceConstants.INVALID_INGREDIENTS_MESSAGE);
+        }
+        if (!INGREDIENT_PATTERN.matcher(ingredient).matches()) {
+            throw new InvalidIngredientsException(
+                    String.format(RecipeServiceConstants.INVALID_INGREDIENT_FORMAT, ingredient)
+            );
+        }
+    }
+
+    private String generateMealImage(String mealName) {
+        if (mealName == null || mealName.isBlank()) {
+            LOGGER.warn("Missing meal name for image generation");
+            return null;
         }
 
-        LOGGER.info("All ingredients validated successfully.");
+        final String sanitizedMealName = mealName.replaceAll("[^a-zA-Z0-9\\s-]", "");
+        final String imagePrompt = String.format(RecipeServiceConstants.IMAGE_PROMPT_FORMAT, sanitizedMealName);
+
+        return recipeResponseParser.extractImageUrl(openAIClient.generateImage(imagePrompt));
     }
 
     private String buildRecipePrompt(List<String> ingredients) {
@@ -85,11 +74,7 @@ public class RecipeService {
         );
     }
 
-    private String buildImagePrompt(String mealName) {
-        return String.format(RecipeServiceConstants.IMAGE_PROMPT_FORMAT, mealName);
-    }
-
-    private GeneratedMealResponse buildGeneratedMealResponse(GeneratedMealResponse mealResponse, String imageUrl) {
+    private GeneratedMealResponse buildFinalResponse(GeneratedMealResponse mealResponse, String imageUrl) {
         return new GeneratedMealResponse(
                 mealResponse.mealName(),
                 mealResponse.ingredientsUsed(),

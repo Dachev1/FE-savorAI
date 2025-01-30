@@ -5,11 +5,15 @@ import dev.idachev.backend.web.dto.GenerateMealRequest;
 import dev.idachev.backend.web.dto.GeneratedMealResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/recipes")
+@RequestMapping("/api/v1/recipes")
 public class RecipeController {
 
     private final RecipeService recipeService;
@@ -20,10 +24,8 @@ public class RecipeController {
     }
 
     @PostMapping("/generate-meal")
-    public ResponseEntity<GeneratedMealResponse> generateMealFromIngredients(
-            @Valid @RequestBody GenerateMealRequest request
-    ) {
-        GeneratedMealResponse generatedMeal = recipeService.generateMeal(request.ingredients());
-        return ResponseEntity.ok(generatedMeal);
+    public ResponseEntity<GeneratedMealResponse> generateMeal(@Valid @RequestBody GenerateMealRequest request) {
+        GeneratedMealResponse response = recipeService.generateMeal(request.ingredients());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }
