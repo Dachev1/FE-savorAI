@@ -1,38 +1,54 @@
-import React, { useState, useEffect } from 'react';
-import AOS from 'aos';
-import 'aos/dist/aos.css';
+import React, { useState } from 'react';
 import axios from '../../api/axiosConfig';
+import RecipeCard from '../../components/RecipeCard';
 
 // -----------------------------------------------
 // Types & Interfaces
 // -----------------------------------------------
+
+interface NutritionalInformation {
+  calories: number;
+  protein: string;
+  carbohydrates: string;
+  fat: string;
+}
+
+interface RecipeDetails {
+  ingredientsList: string[];
+  equipmentNeeded: string[];
+  instructions: string[];
+  servingSuggestions: string[];
+  nutritionalInformation: NutritionalInformation;
+}
+
 interface RecipeResponse {
-  image: string; // Frontend expects 'image'
-  ingredientsUsed: string[];
   mealName: string;
-  recipeDetails: string;
+  ingredientsUsed: string[];
+  recipeDetails: RecipeDetails;
+  imageUrl: string;
+}
+
+interface GeneratedMealResponse {
+  mealName: string;
+  ingredientsUsed: string[];
+  recipeDetails: RecipeDetails;
+  imageUrl: string;
 }
 
 // -----------------------------------------------
-// Main Component
+// Main Component: RecipeGenerator
 // -----------------------------------------------
-const Features: React.FC = () => {
-  // State
+
+const RecipeGenerator: React.FC = () => {
+  // State Management
   const [ingredients, setIngredients] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [recipe, setRecipe] = useState<RecipeResponse | null>(null);
+  const [recipe, setRecipe] = useState<GeneratedMealResponse | null>(null);
   const [copySuccess, setCopySuccess] = useState('');
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // AOS Initialization
-  useEffect(() => {
-    AOS.init({ duration: 1000, easing: 'ease-in-out', once: true });
-  }, []);
-
-  // -----------------------------------------------
-  // Handlers
-  // -----------------------------------------------
+  // Handle Form Submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -44,23 +60,24 @@ const Features: React.FC = () => {
       .map((item) => item.trim())
       .filter(Boolean);
 
+    if (ingredientsArray.length === 0) {
+      setError('Please enter at least one ingredient.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await axios.post<{
-        mealName: string;
-        ingredientsUsed: string[];
-        recipeDetails: string;
-        imageUrl: string;
-      }>(
+      const response = await axios.post<RecipeResponse>(
         '/recipes/generate-meal',
         { ingredients: ingredientsArray }
       );
 
       // Map the backend response to match the frontend interface
-      const mappedRecipe: RecipeResponse = {
-        image: response.data.imageUrl, // Mapping 'imageUrl' to 'image'
-        ingredientsUsed: response.data.ingredientsUsed,
+      const mappedRecipe: GeneratedMealResponse = {
         mealName: response.data.mealName,
+        ingredientsUsed: response.data.ingredientsUsed,
         recipeDetails: response.data.recipeDetails,
+        imageUrl: response.data.imageUrl,
       };
 
       setRecipe(mappedRecipe);
@@ -72,214 +89,109 @@ const Features: React.FC = () => {
     }
   };
 
+  // Copy Recipe Details to Clipboard
   const copyToClipboard = () => {
     if (recipe?.recipeDetails) {
-      navigator.clipboard.writeText(recipe.recipeDetails).then(
-        () => setCopySuccess('Recipe details copied to clipboard!'),
-        () => setCopySuccess('Failed to copy recipe details.')
-      );
+      navigator.clipboard
+        .writeText(formatRecipeDetails(recipe.recipeDetails))
+        .then(
+          () => setCopySuccess('Recipe details copied to clipboard!'),
+          () => setCopySuccess('Failed to copy recipe details.')
+        );
       // Clear message after 3 seconds
       setTimeout(() => setCopySuccess(''), 3000);
     }
   };
 
+  // Toggle Favorite State
   const toggleFavorite = () => {
     setIsFavorite((prev) => !prev);
   };
 
-  // -----------------------------------------------
-  // Render
-  // -----------------------------------------------
+  // Format Recipe Details for Copying
+  const formatRecipeDetails = (details: RecipeDetails): string => {
+    return `
+Ingredients:
+${details.ingredientsList.join('\n')}
+
+Equipment Needed:
+${details.equipmentNeeded.join('\n')}
+
+Instructions:
+${details.instructions.join('\n')}
+
+Serving Suggestions:
+${details.servingSuggestions.join('\n')}
+
+Nutritional Information:
+Calories: ${details.nutritionalInformation.calories}
+Protein: ${details.nutritionalInformation.protein}
+Carbohydrates: ${details.nutritionalInformation.carbohydrates}
+Fat: ${details.nutritionalInformation.fat}
+    `;
+  };
+
   return (
-    <div
-      className="relative flex flex-col min-h-screen bg-gradient-to-br from-light via-softGray to-accent overflow-hidden"
-      data-aos="fade-in"
-    >
-      <BackgroundCircles />
+    <div className="min-h-screen bg-gradient-to-br from-light via-softGray to-accent flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-3xl bg-white/80 backdrop-blur-md rounded-3xl shadow-lg p-10 border border-gray-200">
+        <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-accent to-dark text-center mb-10 drop-shadow-md">
+          Discover Your Recipe
+        </h1>
 
-      <div className="flex-grow flex items-center justify-center px-6 sm:px-8 lg:px-12 py-20">
-        <div
-          className="w-full max-w-3xl bg-white/80 backdrop-blur-md rounded-3xl shadow-lg p-10
-                     border border-gray-200 transition-transform duration-500 hover:-translate-y-2 hover:shadow-2xl"
-          data-aos="fade-up"
-        >
-          <h1
-            className="text-5xl sm:text-6xl font-extrabold text-transparent bg-clip-text
-                       bg-gradient-to-r from-accent to-dark text-center mb-10 drop-shadow-md"
-          >
-            Discover Your Recipe
-          </h1>
-
-          <RecipeGeneratorForm
-            ingredients={ingredients}
-            setIngredients={setIngredients}
-            loading={loading}
-            onSubmit={handleSubmit}
-          />
-
-          {error && (
-            <p className="text-red-500 font-semibold text-center mt-6">
-              {error}
-            </p>
-          )}
-
-          {recipe && (
-            <RecipeCard
-              recipe={recipe}
-              isFavorite={isFavorite}
-              copySuccess={copySuccess}
-              onCopy={copyToClipboard}
-              onToggleFavorite={toggleFavorite}
+        {/* Ingredient Input Form */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label
+              htmlFor="ingredients"
+              className="block mb-2 text-lg font-semibold text-dark"
+            >
+              Enter Ingredients (comma-separated):
+            </label>
+            <input
+              id="ingredients"
+              type="text"
+              placeholder="e.g. chicken, rice, tomatoes"
+              value={ingredients}
+              onChange={(e) => setIngredients(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-5 py-3 text-dark
+                         focus:outline-none focus:ring-4 focus:ring-accent
+                         transition-all placeholder:text-gray-400 shadow-sm"
             />
-          )}
-        </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={!ingredients.trim() || loading}
+            className="w-full py-4 rounded-full bg-gradient-to-r from-accent to-dark
+                       text-white font-bold text-xl shadow-md
+                       transition-transform duration-300 hover:scale-105
+                       focus:outline-none focus:ring-4 focus:ring-dark
+                       disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            {loading ? 'Generating...' : 'Generate Recipe'}
+          </button>
+        </form>
+
+        {/* Error Message */}
+        {error && (
+          <p className="text-red-500 font-semibold text-center mt-6">
+            {error}
+          </p>
+        )}
+
+        {/* Recipe Display */}
+        {recipe && (
+          <RecipeCard
+            recipe={recipe}
+            isFavorite={isFavorite}
+            copySuccess={copySuccess}
+            onCopy={copyToClipboard}
+            onToggleFavorite={toggleFavorite}
+          />
+        )}
       </div>
     </div>
   );
 };
 
-export default Features;
-
-// -----------------------------------------------
-// Subcomponent: BackgroundCircles
-// -----------------------------------------------
-const BackgroundCircles: React.FC = () => (
-  <>
-    <div
-      className="absolute top-0 left-0 w-96 h-96 rounded-full bg-accent opacity-20 blur-3xl animate-pulse -z-10"
-      data-aos="zoom-in"
-    />
-    <div
-      className="absolute bottom-0 right-0 w-72 h-72 rounded-full bg-dark opacity-10 blur-3xl animate-pulse -z-10"
-      data-aos="zoom-in"
-      data-aos-delay="300"
-    />
-  </>
-);
-
-// -----------------------------------------------
-// Subcomponent: RecipeGeneratorForm
-// -----------------------------------------------
-interface RecipeGeneratorFormProps {
-  ingredients: string;
-  setIngredients: React.Dispatch<React.SetStateAction<string>>;
-  loading: boolean;
-  onSubmit: (e: React.FormEvent) => void;
-}
-
-const RecipeGeneratorForm: React.FC<RecipeGeneratorFormProps> = ({
-  ingredients,
-  setIngredients,
-  loading,
-  onSubmit,
-}) => {
-  return (
-    <form onSubmit={onSubmit} className="space-y-8">
-      <div>
-        <label
-          htmlFor="ingredients"
-          className="block mb-3 text-lg font-semibold text-dark"
-        >
-          Enter Ingredients (comma-separated):
-        </label>
-        <input
-          id="ingredients"
-          type="text"
-          placeholder="e.g. chicken, rice, tomatoes"
-          value={ingredients}
-          onChange={(e) => setIngredients(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 px-5 py-3 text-dark
-                     focus:outline-none focus:ring-4 focus:ring-accent
-                     transition-all placeholder:text-gray-400 shadow-sm"
-        />
-      </div>
-
-      <button
-        type="submit"
-        disabled={!ingredients.trim() || loading}
-        className="w-full py-4 rounded-full bg-gradient-to-r from-accent to-dark
-                   text-white font-bold text-xl shadow-md
-                   transition-transform duration-300 hover:scale-105
-                   focus:outline-none focus:ring-4 focus:ring-dark
-                   disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {loading ? 'Generating...' : 'Generate Recipe'}
-      </button>
-    </form>
-  );
-};
-
-// -----------------------------------------------
-// Subcomponent: RecipeCard
-// -----------------------------------------------
-interface RecipeCardProps {
-  recipe: RecipeResponse;
-  isFavorite: boolean;
-  copySuccess: string;
-  onCopy: () => void;
-  onToggleFavorite: () => void;
-}
-
-const RecipeCard: React.FC<RecipeCardProps> = ({
-  recipe,
-  isFavorite,
-  copySuccess,
-  onCopy,
-  onToggleFavorite,
-}) => {
-  return (
-    <div
-      className="mt-10 bg-white rounded-2xl shadow-lg p-8 transition-transform
-                 duration-300 hover:scale-[1.02] border border-gray-100"
-      data-aos="fade-up"
-    >
-      <h2 className="text-4xl font-bold text-accent mb-6 text-center">
-        {recipe.mealName}
-      </h2>
-
-      <div className="relative overflow-hidden rounded-xl mb-6">
-        <img
-          src={recipe.image} // Uses the mapped 'image' field
-          alt={recipe.mealName}
-          className="w-full h-auto object-cover
-                     transform hover:scale-105 transition-transform duration-500"
-        />
-      </div>
-
-      <p className="text-lg text-dark leading-relaxed mb-4">
-        <strong>Ingredients Used:</strong> {recipe.ingredientsUsed.join(', ')}
-      </p>
-
-      <p className="text-dark/90 leading-relaxed text-md whitespace-pre-wrap mb-4">
-        {recipe.recipeDetails}
-      </p>
-
-      <div className="flex justify-between items-center">
-        <button
-          onClick={onCopy}
-          className="py-3 px-6 rounded-lg bg-gradient-to-r from-accent to-dark
-                     text-white font-semibold text-lg shadow-md
-                     transition-transform duration-300 hover:scale-105
-                     focus:outline-none focus:ring-4 focus:ring-dark"
-        >
-          Copy Recipe Details
-        </button>
-        <button
-          onClick={onToggleFavorite}
-          className={`py-3 px-6 rounded-lg text-white font-semibold text-lg
-                     ${
-                       isFavorite ? 'bg-red-500' : 'bg-gray-500'
-                     } shadow-md transition-transform duration-300 hover:scale-105`}
-        >
-          {isFavorite ? '❤️ Added to Favorites' : '🤍 Add to Favorites'}
-        </button>
-      </div>
-
-      {copySuccess && (
-        <p className="text-green-500 font-semibold text-center mt-4">
-          {copySuccess}
-        </p>
-      )}
-    </div>
-  );
-};
+export default RecipeGenerator;

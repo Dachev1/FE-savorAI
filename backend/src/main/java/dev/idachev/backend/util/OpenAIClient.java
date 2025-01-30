@@ -18,7 +18,7 @@ import java.util.Objects;
 @Component
 public class OpenAIClient {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(OpenAIClient.class);
+//    private static final Logger LOGGER = LoggerFactory.getLogger(OpenAIClient.class);
 
     private final WebClient webClient;
     private final Duration apiRequestTimeout;
@@ -74,7 +74,7 @@ public class OpenAIClient {
     public String getMealSuggestion(final String prompt) {
         Map<String, Object> requestPayload = buildChatCompletionRequest(prompt);
         String response = executePostRequest(chatCompletionApiUrl, requestPayload, "Error fetching meal suggestion");
-        LOGGER.debug("Raw OpenAI Recipe Response: {}", response); // Log the raw response
+//        LOGGER.debug("Raw OpenAI Recipe Response: {}", response); // Log the raw response
         return response;
     }
 
@@ -91,7 +91,7 @@ public class OpenAIClient {
                 "size", imageSize
         );
         String response = executePostRequest(imageGenerationApiUrl, requestPayload, "Error generating image");
-        LOGGER.debug("Raw OpenAI Image Response: {}", response); // Log the raw response
+//        LOGGER.debug("Raw OpenAI Image Response: {}", response); // Log the raw response
         return response;
     }
 
@@ -130,7 +130,7 @@ public class OpenAIClient {
             final String errorMessage
     ) {
         try {
-            LOGGER.debug("Sending POST request to {} with payload {}", url, requestBody);
+//            LOGGER.debug("Sending POST request to {} with payload {}", url, requestBody);
             return webClient.post()
                     .uri(url)
                     .bodyValue(requestBody)
@@ -139,7 +139,7 @@ public class OpenAIClient {
                     .timeout(apiRequestTimeout)
                     .block();
         } catch (WebClientResponseException e) {
-            LOGGER.error("API Error - Status: {}, Body: {}", e.getRawStatusCode(), e.getResponseBodyAsString());
+//            LOGGER.error("API Error - Status: {}, Body: {}", e.getRawStatusCode(), e.getResponseBodyAsString());
             throw new RuntimeException(
                     String.format("%s - Status: %d, Body: %s",
                             errorMessage,
@@ -149,7 +149,7 @@ public class OpenAIClient {
                     e
             );
         } catch (Exception e) {
-            LOGGER.error("Unexpected error during API call", e);
+//            LOGGER.error("Unexpected error during API call", e);
             throw new RuntimeException(errorMessage + ": " + e.getMessage(), e);
         }
     }
