@@ -10,19 +10,17 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "openai")
 public class OpenAIClientProperty {
-
     private String apiKey;
     private int apiTimeout;
     private String baseUrl;
-    private String imageGenerationUrl;
+    private String chatCompletionEndpoint;
+    private String imageGenerationEndpoint;
     private String systemMessage;
     private String modelName;
     private int maxTokens;
     private double temperature;
     private double topP;
     private int choicesCount;
-
-    // Image generation fields
     private int imageCount;
     private String imageSize;
 }

@@ -4,58 +4,38 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.validation.FieldError;
-
-import java.util.Map;
-import java.util.stream.Collectors;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    /**
-     * Handles validation errors for @Valid annotated inputs.
-     */
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidationException(MethodArgumentNotValidException ex) {
-        Map<String, String> errors = ex.getBindingResult()
-                .getFieldErrors()
-                .stream()
-                .collect(Collectors.toMap(
-                        FieldError::getField,
-                        FieldError::getDefaultMessage
-                ));
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Validation failed", errors);
+    @ExceptionHandler(ParseException.class)
+    public ResponseEntity<ErrorResponse> handleParseException(ParseException ex) {
+
+        LOGGER.error("ParseException: {}", ex.getMessage(), ex);
+
+        ErrorResponse error = new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), ex.getMessage());
+        return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    /**
-     * Handles IllegalArgumentExceptions.
-     */
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    @ExceptionHandler(InvalidIngredientsException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidIngredientsException(InvalidIngredientsException ex) {
+
+        LOGGER.error("InvalidIngredientsException: {}", ex.getMessage(), ex);
+
+        ErrorResponse error = new ErrorResponse(HttpStatus.BAD_REQUEST.value(), ex.getMessage());
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
     }
 
-    /**
-     * Handles unexpected exceptions.
-     */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, String>> handleGeneralException(Exception ex) {
-        logger.error("Unexpected error occurred", ex);
-        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
-    }
+    public ResponseEntity<ErrorResponse> handleGeneralException(Exception ex) {
 
-    private ResponseEntity<Map<String, Object>> buildErrorResponse(HttpStatus status, String message, Map<String, String> details) {
-        return ResponseEntity.status(status)
-                .body(Map.of("message", message, "details", details));
-    }
+        LOGGER.error("Exception: {}", ex.getMessage(), ex);
 
-    private ResponseEntity<Map<String, String>> buildErrorResponse(HttpStatus status, String message) {
-        return ResponseEntity.status(status)
-                .body(Map.of("message", message));
+        ErrorResponse error = new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "An unexpected error occurred.");
+        return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
