@@ -3,7 +3,6 @@ import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
-import Home from './pages/Home';
 import SignIn from './pages/SignInSignUp/SignIn';
 import SignUp from './pages/SignInSignUp/SignUp';
 import LearnMore from './pages/LearnMore';
@@ -21,7 +20,8 @@ const App: React.FC = () => {
       <Navbar />
       <main className="flex-grow">
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<RecipeGenerator />} />
+          <Route path="/recipes/create" element={<RecipeCreate />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/registration-success" element={<RegistrationSuccess />} />
@@ -29,8 +29,6 @@ const App: React.FC = () => {
           <Route path="/contact" element={<Contact />} />
           <Route path="/about" element={<About />} />
           <Route path="/allergen-setup" element={<AllergenSetup />} />
-          <Route path="/recipes/recipe-generator" element={<RecipeGenerator />} />
-          <Route path="/recipes/create" element={<RecipeCreate />} />
           <Route path="*" element={<Error />} />
         </Routes>
       </main>
