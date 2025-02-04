@@ -32,6 +32,9 @@ public class Recipe {
 
     private boolean aiGenerated;
 
+    @Column
+    private String imageUrl;
+
     @ManyToOne
     private User createdBy;
 

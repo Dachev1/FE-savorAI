@@ -1,8 +1,12 @@
 package dev.idachev.backend.recipe.service;
 
 import dev.idachev.backend.exception.InvalidIngredientsException;
+import dev.idachev.backend.recipe.model.Recipe;
+import dev.idachev.backend.recipe.repository.RecipeRepository;
 import dev.idachev.backend.util.OpenAIClient;
 import dev.idachev.backend.web.dto.GeneratedMealResponse;
+import dev.idachev.backend.web.dto.RecipeRequest;
+import dev.idachev.backend.web.dto.RecipeResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,11 +22,13 @@ public class RecipeService {
 
     private final OpenAIClient openAIClient;
     private final RecipeResponseParser recipeResponseParser;
+    private final RecipeRepository recipeRepository;
 
     @Autowired
-    public RecipeService(OpenAIClient openAIClient, RecipeResponseParser recipeResponseParser) {
+    public RecipeService(OpenAIClient openAIClient, RecipeResponseParser recipeResponseParser, RecipeRepository recipeRepository) {
         this.openAIClient = openAIClient;
         this.recipeResponseParser = recipeResponseParser;
+        this.recipeRepository = recipeRepository;
     }
 
     public GeneratedMealResponse generateMeal(List<String> ingredients) {
@@ -39,6 +45,35 @@ public class RecipeService {
 
         // Step 3: Update mealResponse with imageUrl
         return buildFinalResponse(mealResponse, imageUrl);
+    }
+
+    public RecipeResponse createRecipe(RecipeRequest request) {
+
+        LOGGER.debug("Creating recipe for request: {}", request);
+
+        // Validate ingredients
+        validateIngredients(request.ingredientsUsed());
+
+        Recipe createdRecipe = Recipe.builder()
+                .title(request.mealName())
+                .description(request.recipeDetails())
+                .ingredients(request.ingredientsUsed())
+                .aiGenerated(false) // This is a user-created recipe
+                .imageUrl(request.imageUrl()) // Cam be null
+                .build();
+
+        Recipe savedRecipe = recipeRepository.save(createdRecipe);
+
+        LOGGER.info("Recipe created with id: {}", savedRecipe.getId());
+
+        return new RecipeResponse(
+                savedRecipe.getId(),
+                savedRecipe.getTitle(),
+                savedRecipe.getIngredients(),
+                savedRecipe.getDescription(),
+                savedRecipe.getImageUrl(),
+                savedRecipe.isAiGenerated()
+        );
     }
 
     /**

@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotEmpty;
 
 import java.util.List;
 
-public record CreateRecipeRequest(
+public record RecipeRequest(
         @NotBlank(message = "Meal name is required")
         String mealName,
 
