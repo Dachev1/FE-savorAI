@@ -1,4 +1,3 @@
-// src/components/IngredientsInput.tsx
 import React, { KeyboardEvent } from 'react';
 
 interface IngredientsInputProps {
@@ -18,7 +17,7 @@ const CreateIngredientsInput: React.FC<IngredientsInputProps> = ({
   onRemoveIngredient,
   error,
 }) => {
-  // Add ingredient on Enter key
+  // Add ingredient on Enter key press
   const handleIngredientKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -56,7 +55,11 @@ const CreateIngredientsInput: React.FC<IngredientsInputProps> = ({
           +
         </button>
       </div>
-      {error && <p className="mt-2 text-sm text-red-500 animate-pulse">{error}</p>}
+      {error && (
+        <p className="mt-2 text-sm text-red-500">
+          {error}
+        </p>
+      )}
       <div className="flex flex-wrap gap-2 mt-3">
         {ingredientsUsed.map((ingredient, index) => (
           <div

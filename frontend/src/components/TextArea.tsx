@@ -37,7 +37,11 @@ const TextArea: React.FC<TextAreaProps> = ({
         }`}
         placeholder={placeholder}
       />
-      {error && <p className="mt-2 text-sm text-red-500 animate-pulse">{error}</p>}
+      {error && (
+        <p className="mt-2 text-sm text-red-500">
+          {error}
+        </p>
+      )}
     </div>
   );
 };
