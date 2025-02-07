@@ -10,5 +10,4 @@ public record RecipeResponse(
         String recipeDetails,
         String imageUrl,
         boolean aiGenerated
-) {
-}
+) {}

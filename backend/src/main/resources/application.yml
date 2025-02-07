@@ -16,6 +16,11 @@ spring:
   application:
     name: SavorAI
 
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
 server:
   port: 8080
 
@@ -54,7 +59,7 @@ openai:
     
     **Important:** Do NOT include any additional text, explanations, or fields outside of the specified JSON structure. Ensure that the "instructions" section contains detailed, step-by-step guidance suitable for home cooks.
 
-  modelName: "gpt-4"
+  modelName: "gpt-4o"
   maxTokens: 2000
   temperature: 0.7
   topP: 0.9
@@ -64,3 +69,8 @@ openai:
 
 cors:
   allowed-origins: "http://localhost:5173"
+
+cloudinary:
+  cloud-name: ${cloudinary_cloud_name}
+  api-key: ${cloudinary_api_key}
+  api-secret: ${cloudinary_api_secret}
