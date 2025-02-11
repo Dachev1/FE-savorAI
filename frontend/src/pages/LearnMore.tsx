@@ -1,15 +1,12 @@
 import React, { useEffect } from 'react';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
-import { LEARN_MORE_STEPS, Step } from '../constants/steps';
+import { LEARN_MORE_STEPS } from '../constants/steps';
+import { FeaturesSectionProps, StepCardProps } from '../types/learnMore';
 
 const LearnMore: React.FC = () => {
   useEffect(() => {
-    AOS.init({
-      duration: 800,
-      easing: 'ease-in-out',
-      once: true,
-    });
+    AOS.init({ duration: 800, easing: 'ease-in-out', once: true });
   }, []);
 
   return (
@@ -23,32 +20,17 @@ const LearnMore: React.FC = () => {
 
 export default LearnMore;
 
-/** ------------------------------------------------------------------
- *  Subcomponent: HeroSection
- *  Renders the top hero area with heading and subtitle.
- * ----------------------------------------------------------------- */
 const HeroSection: React.FC = () => (
   <section
     className="flex flex-col items-center text-center py-20 px-6 bg-gradient-to-br from-white via-gray-100 to-gray-200 text-dark"
     data-aos="fade-up"
   >
-    <h1 className="text-5xl md:text-6xl font-extrabold mb-6">
-      Redefine Cooking with Ease
-    </h1>
+    <h1 className="text-5xl md:text-6xl font-extrabold mb-6">Redefine Cooking with Ease</h1>
     <p className="text-lg md:text-xl max-w-4xl leading-relaxed text-dark/70">
-      Experience a seamless, personalized approach to cooking with SavorAI. 
-      Your kitchen, your rules, powered by AI.
+      Experience a seamless, personalized approach to cooking with SavorAI. Your kitchen, your rules, powered by AI.
     </p>
   </section>
 );
-
-/** ------------------------------------------------------------------
- *  Subcomponent: FeaturesSection
- *  Displays a list of steps describing how the product works.
- * ----------------------------------------------------------------- */
-interface FeaturesSectionProps {
-  steps: Step[];
-}
 
 const FeaturesSection: React.FC<FeaturesSectionProps> = ({ steps }) => (
   <section className="py-20 px-6 lg:px-12 bg-gray-100">
@@ -63,20 +45,8 @@ const FeaturesSection: React.FC<FeaturesSectionProps> = ({ steps }) => (
   </section>
 );
 
-/** ------------------------------------------------------------------
- *  Subcomponent: StepCard
- *  Renders an individual step in the features section.
- * ----------------------------------------------------------------- */
-interface StepCardProps {
-  step: Step;
-}
-
 const StepCard: React.FC<StepCardProps> = ({ step }) => (
-  <div
-    className="flex flex-col items-center text-center"
-    data-aos="zoom-in"
-    data-aos-delay={`${step.id * 200}`}
-  >
+  <div className="flex flex-col items-center text-center" data-aos="zoom-in" data-aos-delay={`${step.id * 200}`}>
     <div className="bg-accent text-white w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mb-4 shadow-lg">
       {step.id}
     </div>
@@ -85,16 +55,11 @@ const StepCard: React.FC<StepCardProps> = ({ step }) => (
   </div>
 );
 
-/** ------------------------------------------------------------------
- *  Subcomponent: CTASection
- *  Renders the call-to-action at the bottom.
- * ----------------------------------------------------------------- */
 const CTASection: React.FC = () => (
   <section className="py-16 bg-gray-900 text-white text-center" data-aos="fade-up">
     <h2 className="text-4xl font-bold mb-6">Ready to Elevate Your Cooking?</h2>
     <p className="text-lg max-w-3xl mx-auto mb-8 leading-relaxed">
-      SavorAI transforms your everyday meals into extraordinary experiences. 
-      Start your journey now.
+      SavorAI transforms your everyday meals into extraordinary experiences. Start your journey now.
     </p>
     <a
       href="/signup"

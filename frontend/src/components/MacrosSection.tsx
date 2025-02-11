@@ -1,9 +1,9 @@
 import React from 'react';
-import { IMacros } from '../types/IMacros';
+import { IMacros } from '../types/recipeForm';
 
 interface MacrosSectionProps {
   macros: IMacros;
-  onChange: (field: keyof IMacros, value: string) => void;
+  onChange: (field: string, value: string) => void;
 }
 
 const MacrosSection: React.FC<MacrosSectionProps> = ({ macros, onChange }) => {
@@ -32,7 +32,7 @@ const MacrosSection: React.FC<MacrosSectionProps> = ({ macros, onChange }) => {
                 <input
                   type="number"
                   value={macros[item.field as keyof IMacros]}
-                  onChange={(e) => onChange(item.field as keyof IMacros, e.target.value)}
+                  onChange={(e) => onChange(item.field, e.target.value)}
                   className="w-full px-2 py-1 border rounded"
                   placeholder={item.placeholder}
                 />
