@@ -2,6 +2,8 @@ package dev.idachev.backend.recipe.service;
 
 import dev.idachev.backend.cloudinary.CloudinaryService;
 import dev.idachev.backend.exception.InvalidIngredientsException;
+import dev.idachev.backend.macros.model.Macros;
+import dev.idachev.backend.macros.service.MacrosService;
 import dev.idachev.backend.recipe.model.Recipe;
 import dev.idachev.backend.recipe.repository.RecipeRepository;
 import dev.idachev.backend.util.OpenAIClient;
@@ -26,16 +28,18 @@ public class RecipeService {
     private final RecipeResponseParser recipeResponseParser;
     private final RecipeRepository recipeRepository;
     private final CloudinaryService cloudinaryService;
+    private final MacrosService macrosService;
 
     @Autowired
     public RecipeService(OpenAIClient openAIClient,
                          RecipeResponseParser recipeResponseParser,
                          RecipeRepository recipeRepository,
-                         CloudinaryService cloudinaryService) {
+                         CloudinaryService cloudinaryService, MacrosService macrosService) {
         this.openAIClient = openAIClient;
         this.recipeResponseParser = recipeResponseParser;
         this.recipeRepository = recipeRepository;
         this.cloudinaryService = cloudinaryService;
+        this.macrosService = macrosService;
     }
 
     /**
@@ -76,15 +80,14 @@ public class RecipeService {
                 .aiGenerated(false)
                 .build();
 
+        // Create and attach macros if provided
+        if (request.macros() != null) {
+            Macros macros = macrosService.createMacros(request.macros(), recipe);
+            recipe.setMacros(macros);
+        }
+
         Recipe savedRecipe = recipeRepository.save(recipe);
-        return new RecipeResponse(
-                savedRecipe.getId(),
-                savedRecipe.getTitle(),
-                savedRecipe.getIngredients(),
-                savedRecipe.getDescription(),
-                savedRecipe.getImageUrl(),
-                savedRecipe.isAiGenerated()
-        );
+        return buildRecipeResponse(savedRecipe);
     }
 
     // --- Helper Methods ---
@@ -190,5 +193,16 @@ public class RecipeService {
             return cloudinaryService.uploadImage(imageFile);
         }
         return null;
+    }
+
+    private RecipeResponse buildRecipeResponse(Recipe savedRecipe) {
+        return new RecipeResponse(
+                savedRecipe.getId(),
+                savedRecipe.getTitle(),
+                savedRecipe.getIngredients(),
+                savedRecipe.getDescription(),
+                savedRecipe.getImageUrl(),
+                savedRecipe.isAiGenerated()
+        );
     }
 }

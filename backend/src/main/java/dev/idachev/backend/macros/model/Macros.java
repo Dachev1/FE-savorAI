@@ -19,15 +19,14 @@ public class Macros {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    private Double calories;
+    private String calories;
 
-    private Double protein;
+    private String protein;
 
-    private Double carbs;
+    private String carbs;
 
-    private Double fat;
+    private String fat;
 
-    @OneToOne(optional = false)
-    @JoinColumn(unique = true)
+    @OneToOne
     private Recipe recipe;
 }

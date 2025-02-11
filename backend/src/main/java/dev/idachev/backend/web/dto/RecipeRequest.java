@@ -12,5 +12,8 @@ public record RecipeRequest(
         List<@NotBlank(message = "Ingredient cannot be blank") String> ingredientsUsed,
 
         @NotBlank(message = "Recipe details are required")
-        String recipeDetails
+        String recipeDetails,
+
+        // Optional macros field (can be null)
+        MacrosData macros
 ) {}
