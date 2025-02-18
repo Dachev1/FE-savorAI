@@ -2,6 +2,7 @@ package dev.idachev.backend.recipe.service;
 
 import dev.idachev.backend.cloudinary.CloudinaryService;
 import dev.idachev.backend.exception.InvalidIngredientsException;
+import dev.idachev.backend.exception.RecipeNotFoundException;
 import dev.idachev.backend.macros.model.Macros;
 import dev.idachev.backend.macros.service.MacrosService;
 import dev.idachev.backend.recipe.model.Recipe;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 @Service
@@ -34,7 +36,8 @@ public class RecipeService {
     public RecipeService(OpenAIClient openAIClient,
                          RecipeResponseParser recipeResponseParser,
                          RecipeRepository recipeRepository,
-                         CloudinaryService cloudinaryService, MacrosService macrosService) {
+                         CloudinaryService cloudinaryService,
+                         MacrosService macrosService) {
         this.openAIClient = openAIClient;
         this.recipeResponseParser = recipeResponseParser;
         this.recipeRepository = recipeRepository;
@@ -43,10 +46,7 @@ public class RecipeService {
     }
 
     /**
-     * Generates a meal suggestion based on the provided ingredients.
-     *
-     * @param ingredients List of ingredients.
-     * @return A GeneratedMealResponse containing meal details and an image URL.
+     * Generates a meal recipe based on a list of ingredients.
      */
     public GeneratedMealResponse generateMeal(List<String> ingredients) {
         log.debug("Generating meal for ingredients: {}", ingredients);
@@ -55,18 +55,13 @@ public class RecipeService {
         String recipePrompt = buildRecipePrompt(ingredients);
         String recipeResponse = openAIClient.getMealSuggestion(recipePrompt);
         GeneratedMealResponse mealResponse = recipeResponseParser.parseRecipeResponse(recipeResponse, ingredients);
-
         String imageUrl = generateMealImage(mealResponse.mealName());
 
         return buildFinalResponse(mealResponse, imageUrl);
     }
 
     /**
-     * Creates and saves a recipe based on the provided request and optional image file.
-     *
-     * @param request   RecipeRequest containing meal details.
-     * @param imageFile Optional image file for the recipe.
-     * @return A RecipeResponse representing the saved recipe.
+     * Creates a new recipe.
      */
     public RecipeResponse createRecipe(RecipeRequest request, MultipartFile imageFile) {
         validateIngredients(request.ingredientsUsed());
@@ -80,7 +75,6 @@ public class RecipeService {
                 .aiGenerated(false)
                 .build();
 
-        // Create and attach macros if provided
         if (request.macros() != null) {
             Macros macros = macrosService.createMacros(request.macros(), recipe);
             recipe.setMacros(macros);
@@ -90,64 +84,78 @@ public class RecipeService {
         return buildRecipeResponse(savedRecipe);
     }
 
-    // --- Helper Methods ---
+    /**
+     * Updates an existing recipe.
+     */
+    public RecipeResponse updateRecipe(UUID id, RecipeRequest request, MultipartFile imageFile) {
+        validateIngredients(request.ingredientsUsed());
+        Recipe recipe = recipeRepository.findById(id)
+                .orElseThrow(() -> new RecipeNotFoundException("Recipe not found with id: " + id));
+
+        log.info("Updating recipe with id: {}", id);
+        recipe.setTitle(request.mealName());
+        recipe.setDescription(request.recipeDetails());
+        recipe.setIngredients(request.ingredientsUsed());
+
+        if (imageFile != null && !imageFile.isEmpty()) {
+            String imageUrl = processImageFile(imageFile);
+            recipe.setImageUrl(imageUrl);
+        }
+
+        if (request.macros() != null) {
+            if (recipe.getMacros() != null) {
+                Macros updatedMacros = macrosService.updateMacros(recipe.getMacros(), request.macros());
+                recipe.setMacros(updatedMacros);
+            } else {
+                Macros newMacros = macrosService.createMacros(request.macros(), recipe);
+                recipe.setMacros(newMacros);
+            }
+        }
+
+        Recipe updatedRecipe = recipeRepository.save(recipe);
+        return buildRecipeResponse(updatedRecipe);
+    }
 
     /**
-     * Validates that the ingredients list is not null, empty, and that each ingredient is well-formatted.
-     *
-     * @param ingredients List of ingredients.
+     * Retrieves a recipe by ID and builds the response.
      */
+    public RecipeResponse findByIdAndBuildRecipeResponse(UUID id) {
+        Recipe recipe = recipeRepository.findById(id)
+                .orElseThrow(() -> new RecipeNotFoundException("Recipe not found with id: " + id));
+        return buildRecipeResponse(recipe);
+    }
+
+    // Validate ingredients list and each ingredient format.
     private void validateIngredients(List<String> ingredients) {
         if (ingredients == null || ingredients.isEmpty()) {
-            log.warn("Validation failed: Ingredients list is empty.");
+            log.warn("Ingredients list is empty.");
             throw new InvalidIngredientsException(RecipeServiceConstants.INVALID_INGREDIENTS_MESSAGE);
         }
         ingredients.forEach(this::validateIngredientFormat);
     }
 
-    /**
-     * Validates the format of a single ingredient.
-     *
-     * @param ingredient Ingredient string.
-     */
     private void validateIngredientFormat(String ingredient) {
         if (ingredient == null || ingredient.isBlank()) {
-            log.warn("Validation failed: Ingredient is null or blank.");
+            log.warn("Ingredient is null or blank.");
             throw new InvalidIngredientsException(RecipeServiceConstants.INVALID_INGREDIENTS_MESSAGE);
         }
         if (!INGREDIENT_PATTERN.matcher(ingredient).matches()) {
-            log.warn("Validation failed: Invalid ingredient format - {}", ingredient);
+            log.warn("Invalid ingredient format: {}", ingredient);
             throw new InvalidIngredientsException(
                     String.format(RecipeServiceConstants.INVALID_INGREDIENT_FORMAT, ingredient)
             );
         }
     }
 
-    /**
-     * Builds a recipe prompt using a constant template and the list of ingredients.
-     *
-     * @param ingredients List of ingredients.
-     * @return Formatted recipe prompt string.
-     */
     private String buildRecipePrompt(List<String> ingredients) {
-        return String.format(
-                RecipeServiceConstants.RECIPE_PROMPT_TEMPLATE,
-                String.join(", ", ingredients)
-        );
+        return String.format(RecipeServiceConstants.RECIPE_PROMPT_TEMPLATE, String.join(", ", ingredients));
     }
 
-    /**
-     * Generates an image URL based on the provided meal name.
-     *
-     * @param mealName The name of the meal.
-     * @return Generated image URL or null if the meal name is invalid.
-     */
     private String generateMealImage(String mealName) {
         if (mealName == null || mealName.isBlank()) {
             log.warn("Missing meal name for image generation.");
             return null;
         }
-
         String sanitizedMealName = sanitizeMealName(mealName);
         String imagePrompt = String.format(RecipeServiceConstants.IMAGE_PROMPT_FORMAT, sanitizedMealName);
         log.debug("Generating image with prompt: {}", imagePrompt);
@@ -156,23 +164,10 @@ public class RecipeService {
         return recipeResponseParser.parseImageResponse(imageResponse);
     }
 
-    /**
-     * Removes unwanted characters from the meal name.
-     *
-     * @param mealName The original meal name.
-     * @return A sanitized version of the meal name.
-     */
     private String sanitizeMealName(String mealName) {
         return mealName.replaceAll("[^a-zA-Z0-9\\s-]", "").trim();
     }
 
-    /**
-     * Combines the generated meal response and image URL into the final response.
-     *
-     * @param mealResponse The initial generated meal response.
-     * @param imageUrl     The generated image URL.
-     * @return Finalized GeneratedMealResponse.
-     */
     private GeneratedMealResponse buildFinalResponse(GeneratedMealResponse mealResponse, String imageUrl) {
         return new GeneratedMealResponse(
                 mealResponse.mealName(),
@@ -182,17 +177,10 @@ public class RecipeService {
         );
     }
 
-    /**
-     * Processes the image file: if present and not empty, uploads the image and returns its URL.
-     *
-     * @param imageFile Multipart image file.
-     * @return The URL of the uploaded image, or null if no file is provided.
-     */
     private String processImageFile(MultipartFile imageFile) {
-        if (imageFile != null && !imageFile.isEmpty()) {
-            return cloudinaryService.uploadImage(imageFile);
-        }
-        return null;
+        return (imageFile != null && !imageFile.isEmpty())
+                ? cloudinaryService.uploadImage(imageFile)
+                : null;
     }
 
     private RecipeResponse buildRecipeResponse(Recipe savedRecipe) {

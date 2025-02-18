@@ -12,7 +12,7 @@ const SuccessModal: React.FC<SuccessModalProps> = ({ message, recipeId, onClose 
   const navigate = useNavigate();
 
   const handleViewPreview = () => {
-    onClose(); // Close modal before navigation
+    onClose();
     if (recipeId) {
       navigate(`/recipes/preview/${recipeId}`);
     }
@@ -23,7 +23,7 @@ const SuccessModal: React.FC<SuccessModalProps> = ({ message, recipeId, onClose 
       {/* Backdrop (clicking it also closes the modal) */}
       <div className="absolute inset-0 bg-black opacity-50" onClick={onClose}></div>
       {/* Modal Content */}
-      <div className="relative bg-white p-8 rounded-xl shadow-2xl border border-green-400 transform transition-all duration-500 ease-out animate-modalIn">
+      <div className="relative bg-white p-8 rounded-xl shadow-2xl transform transition-all duration-500 ease-out animate-modalIn">
         {/* Close Button (turns red on hover) */}
         <button
           onClick={onClose}

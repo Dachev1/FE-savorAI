@@ -1,5 +1,5 @@
-// pages/RecipeCreate.tsx
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 import axios from '../../api/axiosConfig';
@@ -13,26 +13,53 @@ import MacrosSection from '../../components/MacrosSection';
 import SuccessModal from '../../components/SuccessModal';
 import { IFormErrors, IMacros, IRecipeFormData, IRecipePayload } from '../../types/recipeForm';
 
+const initialMacros: IMacros = { calories: '', protein: '', carbs: '', fat: '' };
+
 const RecipeCreate: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const editingRecipe = location.state?.recipe;
+  const isEditing = Boolean(editingRecipe);
+
+  // Form state
   const [mealName, setMealName] = useState('');
   const [ingredientsUsed, setIngredientsUsed] = useState<string[]>([]);
   const [newIngredient, setNewIngredient] = useState('');
   const [recipeDetails, setRecipeDetails] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [macros, setMacros] = useState<IMacros>({ calories: '', protein: '', carbs: '', fat: '' });
+  const [macros, setMacros] = useState<IMacros>(initialMacros);
   const [showMacros, setShowMacros] = useState(false);
   const [errors, setErrors] = useState<IFormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [createdRecipeId, setCreatedRecipeId] = useState<string | null>(null);
 
-  // Initialize AOS once on mount.
+  // Initialize animations
   useEffect(() => {
     AOS.init({ duration: 800, once: true });
   }, []);
 
-  // Reset form state.
+  // Pre-fill form if editing an existing recipe
+  useEffect(() => {
+    if (!editingRecipe) return;
+
+    setMealName(editingRecipe.mealName || '');
+    
+    // Handle recipe details whether it's a string or an object with instructions.
+    if (typeof editingRecipe.recipeDetails === 'string') {
+      setRecipeDetails(editingRecipe.recipeDetails);
+    } else if (editingRecipe.recipeDetails?.instructions) {
+      setRecipeDetails(editingRecipe.recipeDetails.instructions.join(' '));
+    }
+    
+    setIngredientsUsed(editingRecipe.ingredientsUsed || []);
+    if (editingRecipe.imageUrl) setImagePreview(editingRecipe.imageUrl);
+    // Uncomment if macros are available:
+    // if (editingRecipe.macros) setMacros(editingRecipe.macros);
+  }, [editingRecipe]);
+
+  // Helper: Reset form fields to initial values
   const resetForm = useCallback(() => {
     setMealName('');
     setRecipeDetails('');
@@ -40,35 +67,42 @@ const RecipeCreate: React.FC = () => {
     setNewIngredient('');
     setImageFile(null);
     setImagePreview(null);
-    setMacros({ calories: '', protein: '', carbs: '', fat: '' });
+    setMacros(initialMacros);
     setErrors({});
     setShowMacros(false);
   }, []);
 
-  // Validate form data.
-  const validateForm = (formData: IRecipeFormData): IFormErrors => {
-    const errors: IFormErrors = {};
-    if (!formData.mealName.trim()) errors.mealName = 'Meal Name is required.';
-    if (formData.ingredientsUsed.length === 0) errors.ingredientsUsed = 'At least one ingredient is required.';
-    if (!formData.recipeDetails.trim()) errors.recipeDetails = 'Recipe details are required.';
-    return errors;
-  };
+  // Helper: Validate form and return error object (if any)
+  const validateForm = useCallback((formData: IRecipeFormData): IFormErrors => {
+    const formErrors: IFormErrors = {};
+    if (!formData.mealName.trim()) {
+      formErrors.mealName = 'Meal Name is required.';
+    }
+    if (formData.ingredientsUsed.length === 0) {
+      formErrors.ingredientsUsed = 'At least one ingredient is required.';
+    }
+    if (!formData.recipeDetails.trim()) {
+      formErrors.recipeDetails = 'Recipe details are required.';
+    }
+    return formErrors;
+  }, []);
 
-  // Submit the recipe to the backend.
-  const handleCreateRecipe = async () => {
+  // Handler: Submit form for create or update
+  const handleSubmit = useCallback(async () => {
     setSuccessMessage('');
     const formDataObj: IRecipeFormData = {
       mealName,
       recipeDetails,
       ingredientsUsed,
       imageFile,
-      macros: Object.values(macros).some((value) => value !== '') ? macros : undefined,
+      macros: Object.values(macros).some((val) => val !== '') ? macros : undefined,
     };
 
     const formErrors = validateForm(formDataObj);
     setErrors(formErrors);
     if (Object.keys(formErrors).length > 0) return;
 
+    // Prepare payload and FormData for submission
     const recipePayload: IRecipePayload = {
       mealName,
       recipeDetails,
@@ -84,147 +118,157 @@ const RecipeCreate: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post('/recipes/create-meal', formDataToSend);
-      console.log('New Recipe Created:', response.data);
-      setSuccessMessage('Your meal was uploaded successfully!');
-      setCreatedRecipeId(response.data.id);
-      resetForm();
+      if (isEditing && editingRecipe.id) {
+        const response = await axios.put(`/recipes/${editingRecipe.id}`, formDataToSend);
+        console.log('Recipe Updated:', response.data);
+        setSuccessMessage('Your meal was updated successfully!');
+        setCreatedRecipeId(editingRecipe.id);
+      } else {
+        const response = await axios.post('/recipes/create-meal', formDataToSend);
+        console.log('New Recipe Created:', response.data);
+        setSuccessMessage('Your meal was uploaded successfully!');
+        setCreatedRecipeId(response.data.id);
+        resetForm();
+      }
     } catch (error) {
-      console.error('Error creating recipe:', error);
+      console.error(isEditing ? 'Error updating recipe:' : 'Error creating recipe:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [
+    mealName,
+    recipeDetails,
+    ingredientsUsed,
+    imageFile,
+    macros,
+    validateForm,
+    resetForm,
+    isEditing,
+    editingRecipe,
+  ]);
 
-  // Update the image selection and preview.
+  // Handler: File selection for image upload
   const handleFileSelection = useCallback((file: File) => {
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
   }, []);
 
-  // Add a new ingredient.
+  // Handler: Add ingredient to list
   const handleAddIngredient = useCallback(() => {
-    if (newIngredient.trim()) {
-      setIngredientsUsed((prev) => [...prev, newIngredient.trim()]);
-      setNewIngredient('');
-      if (errors.ingredientsUsed) {
-        setErrors((prev) => ({ ...prev, ingredientsUsed: undefined }));
-      }
+    const trimmed = newIngredient.trim();
+    if (!trimmed) return;
+    setIngredientsUsed((prev) => [...prev, trimmed]);
+    setNewIngredient('');
+    if (errors.ingredientsUsed) {
+      setErrors((prev) => ({ ...prev, ingredientsUsed: undefined }));
     }
   }, [newIngredient, errors.ingredientsUsed]);
 
-  // Remove an ingredient by index.
+  // Handler: Remove ingredient by index
   const handleRemoveIngredient = useCallback((index: number) => {
     setIngredientsUsed((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  // Update macros. Note: The field is received as a string and then cast to a valid key.
+  // Handler: Change macro value
   const handleMacroChange = useCallback((field: string, value: string) => {
     setMacros((prev) => ({ ...prev, [field as keyof IMacros]: value }));
   }, []);
 
   return (
-    <div className="relative flex items-center justify-center min-h-screen bg-gradient-to-br from-accent to-light p-4 overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-accent to-light p-4 overflow-hidden">
       <FlyingFoods />
-      <div
-        className="relative z-10 bg-white shadow-2xl rounded-3xl p-8 w-full max-w-md hover:shadow-2xl transition-all transform hover:-translate-y-1"
-        data-aos="fade-up"
-      >
-        <HeaderSection />
-        <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
-          <TextInput
-            label="Meal Name"
-            id="mealName"
-            value={mealName}
-            setValue={(value) => {
-              setMealName(value);
-              if (errors.mealName) {
-                setErrors((prev) => ({ ...prev, mealName: undefined }));
-              }
-            }}
-            error={errors.mealName}
-            placeholder="e.g. Spiced Chicken Rice Pilaf"
-          />
-          <IngredientsInput
-            ingredientsUsed={ingredientsUsed}
-            newIngredient={newIngredient}
-            setNewIngredient={(value) => {
-              setNewIngredient(value);
-              if (errors.ingredientsUsed) {
-                setErrors((prev) => ({ ...prev, ingredientsUsed: undefined }));
-              }
-            }}
-            onAddIngredient={handleAddIngredient}
-            onRemoveIngredient={handleRemoveIngredient}
-            error={errors.ingredientsUsed}
-          />
-          <TextArea
-            label="Recipe Details"
-            id="recipeDetails"
-            value={recipeDetails}
-            setValue={(value) => {
-              setRecipeDetails(value);
-              if (errors.recipeDetails) {
-                setErrors((prev) => ({ ...prev, recipeDetails: undefined }));
-              }
-            }}
-            error={errors.recipeDetails}
-            placeholder="Describe the preparation steps..."
-          />
-          <DragDropImageInput imagePreview={imagePreview} onFileSelect={handleFileSelection} />
-          <div className="mt-6">
+      <div className="mt-24 mx-auto w-full max-w-sm">
+        <div
+          className="relative z-10 bg-white shadow-2xl rounded-3xl p-8 transition-all transform"
+          data-aos="fade-up"
+        >
+          <HeaderSection />
+          <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+            <TextInput
+              label="Meal Name"
+              id="mealName"
+              value={mealName}
+              setValue={(value) => {
+                setMealName(value);
+                if (errors.mealName) {
+                  setErrors((prev) => ({ ...prev, mealName: undefined }));
+                }
+              }}
+              error={errors.mealName}
+              placeholder="e.g. Spiced Chicken Rice Pilaf"
+            />
+            <IngredientsInput
+              ingredientsUsed={ingredientsUsed}
+              newIngredient={newIngredient}
+              setNewIngredient={(value) => {
+                setNewIngredient(value);
+                if (errors.ingredientsUsed) {
+                  setErrors((prev) => ({ ...prev, ingredientsUsed: undefined }));
+                }
+              }}
+              onAddIngredient={handleAddIngredient}
+              onRemoveIngredient={handleRemoveIngredient}
+              error={errors.ingredientsUsed}
+            />
+            <TextArea
+              label="Recipe Details"
+              id="recipeDetails"
+              value={recipeDetails}
+              setValue={(value) => {
+                setRecipeDetails(value);
+                if (errors.recipeDetails) {
+                  setErrors((prev) => ({ ...prev, recipeDetails: undefined }));
+                }
+              }}
+              error={errors.recipeDetails}
+              placeholder="Describe the preparation steps..."
+            />
+            <DragDropImageInput imagePreview={imagePreview} onFileSelect={handleFileSelection} />
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={() => setShowMacros((prev) => !prev)}
+                className="w-full py-2 bg-blue-500 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-600 transition"
+              >
+                {showMacros ? 'Hide Macros' : 'Add Macros (optional)'}
+              </button>
+              {showMacros && <MacrosSection macros={macros} onChange={handleMacroChange} />}
+            </div>
             <button
               type="button"
-              onClick={() => setShowMacros((prev) => !prev)}
-              className="w-full py-2 bg-blue-500 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-600 transition duration-300 transform hover:-translate-y-1"
+              onClick={handleSubmit}
+              disabled={isLoading}
+              className="w-full py-3 bg-accent text-white font-semibold rounded-lg shadow-lg hover:bg-dark transition flex items-center justify-center"
             >
-              {showMacros ? 'Hide Macros' : 'Add Macros (optional)'}
+              {isLoading ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  {isEditing ? 'Updating...' : 'Creating...'}
+                </span>
+              ) : (
+                isEditing ? 'Edit Recipe' : 'Create Recipe'
+              )}
             </button>
-            {showMacros && <MacrosSection macros={macros} onChange={handleMacroChange} />}
-          </div>
-          <button
-            type="button"
-            onClick={handleCreateRecipe}
-            disabled={isLoading}
-            className="w-full py-3 bg-accent text-white font-semibold rounded-lg shadow-lg hover:bg-dark transition-transform transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center"
-          >
-            {isLoading ? (
-              <span className="flex items-center">
-                <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
-                </svg>
-                Creating...
-              </span>
-            ) : (
-              'Create Recipe'
-            )}
-          </button>
-        </form>
+          </form>
+        </div>
       </div>
       {successMessage && (
         <SuccessModal
           message={successMessage}
           recipeId={createdRecipeId}
-          onClose={() => setSuccessMessage('')}
+          onClose={() => {
+            setSuccessMessage('');
+            navigate('/recipes');
+          }}
         />
       )}
-      <style>{`
-        @keyframes modalIn {
-          from { opacity: 0; transform: translateY(-20px) scale(0.95); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .animate-modalIn { animation: modalIn 0.5s forwards; }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .fade-in { animation: fadeIn 0.5s ease-out; }
-      `}</style>
     </div>
   );
 };

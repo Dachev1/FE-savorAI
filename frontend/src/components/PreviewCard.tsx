@@ -1,102 +1,61 @@
-import React, { useState } from 'react';
-import Modal from './Modal';
-import { RecipeResponse } from '../types';
+import React from 'react';
+import { RecipeResponse } from '../types/recipe';
 
 interface PreviewCardProps {
   recipe: RecipeResponse;
 }
 
+// Helper function to extract instructions from recipeDetails.
+const getInstructions = (recipeDetails: RecipeResponse['recipeDetails']): string => {
+  if (typeof recipeDetails === 'string') return recipeDetails;
+  return recipeDetails?.instructions?.join(' ') || '';
+};
+
 const PreviewCard: React.FC<PreviewCardProps> = ({ recipe }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Handlers for modal open/close
-  const openModal = () => setIsModalOpen(true);
-  const closeModal = () => setIsModalOpen(false);
-
-  // Optional helper to clean up instructions (removing "Step X:" if present)
-  const cleanInstructions = (instructions: string[]): string[] =>
-    instructions.map((instruction) => instruction.replace(/^Step\s*\d+:\s*/, ''));
+  const instructions = getInstructions(recipe.recipeDetails);
 
   return (
-    <>
-      {/* Preview Card Container */}
-      <div
-        className="bg-white rounded-xl shadow-lg p-6 transition transform hover:scale-105 border border-gray-200"
-        data-aos="fade-up"
-      >
-        <h2 className="text-3xl font-bold text-primary mb-4 text-center">
+    <div className="bg-white rounded-2xl shadow-xl overflow-hidden transition-transform duration-300 hover:scale-105">
+      <div className="p-8">
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-6 font-serif tracking-wide">
           {recipe.mealName}
-        </h2>
+        </h1>
 
-        {recipe.imageUrl && (
-          <div className="overflow-hidden rounded-lg mb-4">
-            <img
-              src={recipe.imageUrl}
-              alt={recipe.mealName}
-              className="w-full h-48 object-cover"
-            />
-          </div>
-        )}
-
-        <p className="text-gray-700 mb-4">
-          <strong>Ingredients:</strong> {recipe.ingredientsUsed.join(', ')}
-        </p>
-
-        <button
-          onClick={openModal}
-          className="w-full py-2 bg-primary text-white font-semibold rounded hover:bg-primary-dark transition"
-          aria-label="View Full Recipe Details"
-        >
-          View Full Details
-        </button>
-      </div>
-
-      {/* Modal for Full Recipe Details */}
-      <Modal isOpen={isModalOpen} onClose={closeModal}>
-        <div className="p-4">
-          <h2 className="text-2xl font-bold text-primary mb-4">{recipe.mealName}</h2>
-
-          <div className="mb-4">
-            <h3 className="text-xl font-semibold text-gray-800">Ingredients:</h3>
-            <ul className="list-disc list-inside text-gray-700">
+        {recipe.ingredientsUsed?.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-3 border-b border-gray-200 pb-2">
+              Ingredients
+            </h2>
+            <ul className="list-disc pl-6 space-y-2 text-gray-700 text-base">
               {recipe.ingredientsUsed.map((ingredient, index) => (
-                <li key={index}>{ingredient}</li>
+                <li key={index} className="hover:text-accent transition-colors duration-200">
+                  {ingredient}
+                </li>
               ))}
             </ul>
           </div>
+        )}
 
-          {recipe.recipeDetails.instructions && recipe.recipeDetails.instructions.length > 0 && (
-            <div className="mb-4">
-              <h3 className="text-xl font-semibold text-gray-800">Instructions:</h3>
-              <ol className="list-decimal list-inside text-gray-700">
-                {cleanInstructions(recipe.recipeDetails.instructions).map((instruction, index) => (
-                  <li key={index} className="mb-1">{instruction}</li>
-                ))}
-              </ol>
-            </div>
-          )}
+        {instructions && (
+          <div>
+            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-3 border-b border-gray-200 pb-2">
+              How to Cook It 🍽️
+            </h2>
+            <p className="text-gray-700 leading-relaxed text-base">{instructions}</p>
+          </div>
+        )}
+      </div>
 
-          {recipe.recipeDetails.nutritionalInformation && (
-            <div className="mb-4">
-              <h3 className="text-xl font-semibold text-gray-800">Nutritional Information:</h3>
-              <ul className="list-none text-gray-700">
-                <li>Calories: {recipe.recipeDetails.nutritionalInformation.calories}</li>
-                <li>Protein: {recipe.recipeDetails.nutritionalInformation.protein}</li>
-                <li>Carbohydrates: {recipe.recipeDetails.nutritionalInformation.carbohydrates}</li>
-                <li>Fat: {recipe.recipeDetails.nutritionalInformation.fat}</li>
-              </ul>
-            </div>
-          )}
-
-          <button
-            onClick={closeModal}
-            className="mt-4 px-4 py-2 bg-gray-300 text-gray-800 font-semibold rounded hover:bg-gray-400 transition"
-          >
-            Close
-          </button>
+      {recipe.imageUrl && (
+        <div className="relative h-80 w-full">
+          <img
+            src={recipe.imageUrl}
+            alt={recipe.mealName}
+            className="w-full h-full object-cover"
+          />
         </div>
-      </Modal>
-    </>
+      )}
+    </div>
   );
 };
 

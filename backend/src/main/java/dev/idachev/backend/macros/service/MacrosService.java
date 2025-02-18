@@ -21,4 +21,17 @@ public class MacrosService {
                 .recipe(recipe)
                 .build();
     }
+
+    public Macros updateMacros(Macros existingMacros, MacrosData newData) {
+
+        if (newData == null) {
+            return existingMacros;
+        }
+
+        existingMacros.setCalories(newData.calories());
+        existingMacros.setProtein(newData.protein());
+        existingMacros.setCarbs(newData.carbs());
+        existingMacros.setFat(newData.fat());
+        return existingMacros;
+    }
 }
