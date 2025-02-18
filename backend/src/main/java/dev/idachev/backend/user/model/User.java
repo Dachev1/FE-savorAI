@@ -14,7 +14,6 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "users")
 public class User {
 
     @Id
@@ -40,6 +39,11 @@ public class User {
 
     private String avatarPath;
 
-    @ManyToMany
+    @ManyToMany()
+    @JoinTable(
+            name = "user_allergens",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "allergen_id")
+    )
     private Set<Allergen> allergies = new HashSet<>();
 }

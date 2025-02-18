@@ -12,7 +12,6 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "macros")
 public class Macros {
 
     @Id
@@ -20,13 +19,11 @@ public class Macros {
     private UUID id;
 
     private String calories;
-
     private String protein;
-
     private String carbs;
-
     private String fat;
 
     @OneToOne
+    @JoinColumn(name = "recipe_id", nullable = false)
     private Recipe recipe;
 }

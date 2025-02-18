@@ -15,7 +15,6 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "favorite_recipes")
 public class FavoriteRecipe {
 
     @Id
@@ -23,11 +22,10 @@ public class FavoriteRecipe {
     private UUID id;
 
     @ManyToOne(optional = false)
+    @JoinColumn(name = "user_id")
     private User user;
 
     @ManyToOne(optional = false)
+    @JoinColumn(name = "recipe_id")
     private Recipe recipe;
-
-    @ElementCollection
-    private List<String> customIngredients = new ArrayList<>();
 }
