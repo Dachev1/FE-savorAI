@@ -4,7 +4,6 @@ spring:
     username: ${db_username}
     password: ${db_password}
     driver-class-name: com.mysql.cj.jdbc.Driver
-
   jpa:
     hibernate:
       ddl-auto: update
@@ -12,64 +11,35 @@ spring:
     properties:
       hibernate:
         format_sql: true
-
   application:
     name: SavorAI
-
   servlet:
     multipart:
       max-file-size: 5MB
       max-request-size: 5MB
-
+  ai:
+    openai:
+      api-key: ${openai_api_key}
+      chat:
+        model: gpt-4o
+        temperature: 1
+        max-tokens: 2000
+      image:
+        options:
+          model: dall-e-2
+          quality: standard # DALL-E-2 only have standard
+          width: 512
+          height: 512
 server:
   port: 8080
-
 logging:
   level:
     root: info
     dev.idachev.backend: debug
     org.hibernate.SQL: debug
     org.springframework.web: debug
-
-openai:
-  apiKey: ${openai_api_key}
-  apiTimeout: 30
-  baseUrl: https://api.openai.com/v1
-  chatCompletionEndpoint: /chat/completions
-  imageGenerationEndpoint: /images/generations
-  systemMessage: |
-    You are an expert culinary assistant with extensive knowledge of global cuisines and modern cooking techniques. Your task is to generate a unique, delicious, and easy-to-follow recipe based on the provided list of ingredients. **Please respond ONLY with a JSON object following this exact structure:**
-    
-    {
-      "mealName": "String",
-      "ingredientsUsed": ["String", "String", ...],
-      "recipeDetails": {
-        "ingredientsList": ["String", "String", ...],
-        "equipmentNeeded": ["String", "String", ...],
-        "instructions": ["Step 1", "Step 2", ...],
-        "servingSuggestions": ["Suggestion 1", "Suggestion 2", ...],
-        "nutritionalInformation": {
-          "calories": Number,
-          "protein": "String",
-          "carbohydrates": "String",
-          "fat": "String"
-        }
-      }
-    }
-    
-    **Important:** Do NOT include any additional text, explanations, or fields outside of the specified JSON structure. Ensure that the "instructions" section contains detailed, step-by-step guidance suitable for home cooks.
-
-  modelName: "gpt-4o"
-  maxTokens: 2000
-  temperature: 0.7
-  topP: 0.9
-  choicesCount: 1
-  imageCount: 1
-  imageSize: "512x512"
-
 cors:
   allowed-origins: "http://localhost:5173"
-
 cloudinary:
   cloud-name: ${cloudinary_cloud_name}
   api-key: ${cloudinary_api_key}

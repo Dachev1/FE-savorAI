@@ -15,17 +15,20 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "favorite_recipes")
+@Table(name = "favorite_recipes", 
+    uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "recipe_id"}))
 public class FavoriteRecipe {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recipe_id", nullable = false)
     private Recipe recipe;
 
     @ElementCollection

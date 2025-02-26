@@ -1,8 +1,9 @@
 package dev.idachev.backend.recipe.model;
 
-import dev.idachev.backend.аllergen.model.Allergen;
+import dev.idachev.backend.favourite.model.FavoriteRecipe;
 import dev.idachev.backend.macros.model.Macros;
 import dev.idachev.backend.user.model.User;
+import dev.idachev.backend.аllergen.model.Allergen;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -34,12 +35,21 @@ public class Recipe {
 
     private String imageUrl;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_id", nullable = false)
     private User createdBy;
 
-    @OneToOne(mappedBy = "recipe", cascade = CascadeType.ALL)
+    @OneToOne(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
     private Macros macros;
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "recipe_allergies",
+            joinColumns = @JoinColumn(name = "recipe_id"),
+            inverseJoinColumns = @JoinColumn(name = "allergen_id")
+    )
     private Set<Allergen> allergies = new HashSet<>();
+
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL)
+    private Set<FavoriteRecipe> favoritedBy = new HashSet<>();
 }

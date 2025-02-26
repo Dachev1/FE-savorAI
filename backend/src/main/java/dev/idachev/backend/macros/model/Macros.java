@@ -19,14 +19,15 @@ public class Macros {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    private String calories;
+    private Integer calories;
 
-    private String protein;
+    private Double protein;
 
-    private String carbs;
+    private Double carbs;
 
-    private String fat;
+    private Double fat;
 
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recipe_id", nullable = false)
     private Recipe recipe;
 }

@@ -1,5 +1,7 @@
 package dev.idachev.backend.user.model;
 
+import dev.idachev.backend.favourite.model.FavoriteRecipe;
+import dev.idachev.backend.recipe.model.Recipe;
 import dev.idachev.backend.аllergen.model.Allergen;
 import jakarta.persistence.*;
 import lombok.*;
@@ -40,6 +42,17 @@ public class User {
 
     private String avatarPath;
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "user_allergies",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "allergen_id")
+    )
     private Set<Allergen> allergies = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<FavoriteRecipe> favoriteRecipes = new HashSet<>();
+
+    @OneToMany(mappedBy = "createdBy", cascade = CascadeType.ALL)
+    private Set<Recipe> createdRecipes = new HashSet<>();
 }

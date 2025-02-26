@@ -1,8 +1,8 @@
 package dev.idachev.backend.web.dto;
 
 public record MacrosData(
-        String calories,
-        String protein,
-        String carbs,
-        String fat
+        Integer calories,
+        Double protein,
+        Double carbs,
+        Double fat
 ) {}

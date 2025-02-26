@@ -27,9 +27,9 @@ public class Allergen {
 
     private String description;
 
-    @ManyToMany(mappedBy = "allergies")
+    @ManyToMany(mappedBy = "allergies", fetch = FetchType.LAZY)
     private Set<User> users = new HashSet<>();
 
-    @ManyToMany(mappedBy = "allergies")
+    @ManyToMany(mappedBy = "allergies", fetch = FetchType.LAZY)
     private Set<Recipe> recipes = new HashSet<>();
 }
