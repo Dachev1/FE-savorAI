@@ -15,6 +15,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/v1/recipes")
 @Slf4j
@@ -33,7 +35,6 @@ public class RecipeController {
                     @ApiResponse(responseCode = "400", description = "Invalid input")
             })
     public ResponseEntity<GeneratedMealResponse> generateMeal(@Valid @RequestBody GenerateMealRequest request) {
-        log.info("Generating meal with ingredients: {}", request.ingredients());
         GeneratedMealResponse response = recipeService.generateMeal(request.ingredients());
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
@@ -51,36 +52,36 @@ public class RecipeController {
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
-//    /**
-//     * Retrieve recipe details by ID.
-//     */
-//    @GetMapping("/{id}")
-//    @Operation(summary = "Retrieve recipe details by ID",
-//            responses = {
-//                    @ApiResponse(responseCode = "200", description = "Recipe retrieved successfully"),
-//                    @ApiResponse(responseCode = "404", description = "Recipe not found")
-//            })
-//    public ResponseEntity<RecipeResponse> getRecipe(@PathVariable UUID id) {
-//        log.info("Fetching recipe with id: {}", id);
-//        RecipeResponse recipeResponse = recipeService.findByIdAndBuildRecipeResponse(id);
-//        return ResponseEntity.ok(recipeResponse);
-//    }
-//
-//    /**
-//     * Update an existing recipe.
-//     */
-//    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-//    @Operation(summary = "Update an existing recipe",
-//            responses = {
-//                    @ApiResponse(responseCode = "200", description = "Recipe updated successfully"),
-//                    @ApiResponse(responseCode = "400", description = "Invalid input"),
-//                    @ApiResponse(responseCode = "404", description = "Recipe not found")
-//            })
-//    public ResponseEntity<RecipeResponse> updateRecipe(@PathVariable UUID id,
-//                                                       @RequestPart("request") @Valid RecipeRequest request,
-//                                                       @RequestPart(value = "image", required = false) MultipartFile imageFile) {
-//        log.info("Updating recipe: {}", request);
-//        RecipeResponse recipeResponse = recipeService.updateRecipe(id, request, imageFile);
-//        return ResponseEntity.ok(recipeResponse);
-//    }
+    /**
+     * Retrieve recipe details by ID.
+     */
+    @GetMapping("/{id}")
+    @Operation(summary = "Retrieve recipe details by ID",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Recipe retrieved successfully"),
+                    @ApiResponse(responseCode = "404", description = "Recipe not found")
+            })
+    public ResponseEntity<RecipeResponse> getRecipe(@PathVariable UUID id) {
+        log.info("Fetching recipe with id: {}", id);
+        RecipeResponse recipeResponse = recipeService.findByIdAndBuildRecipeResponse(id);
+        return ResponseEntity.ok(recipeResponse);
+    }
+
+    /**
+     * Update an existing recipe.
+     */
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Update an existing recipe",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Recipe updated successfully"),
+                    @ApiResponse(responseCode = "400", description = "Invalid input"),
+                    @ApiResponse(responseCode = "404", description = "Recipe not found")
+            })
+    public ResponseEntity<RecipeResponse> updateRecipe(@PathVariable UUID id,
+                                                       @RequestPart("request") @Valid RecipeRequest request,
+                                                       @RequestPart(value = "image", required = false) MultipartFile imageFile) {
+        log.info("Updating recipe: {}", request);
+        RecipeResponse recipeResponse = recipeService.updateRecipe(id, request, imageFile);
+        return ResponseEntity.ok(recipeResponse);
+    }
 }

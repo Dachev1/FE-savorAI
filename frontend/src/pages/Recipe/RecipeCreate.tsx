@@ -1,25 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
-import axios from '../../api/axiosConfig';
-import HeaderSection from '../../components/HeaderSection';
-import TextInput from '../../components/TextInput';
-import TextArea from '../../components/TextArea';
-import IngredientsInput from '../../components/CreateIngredientsInput';
-import DragDropImageInput from '../../components/DragDropImageInput';
+import axios from '../../api/axiosConfig.tsx';
+import TextInput from '../../components/common/Input/TextInput';
+import TextArea from '../../components/common/Input/TextArea';
+import { CreateIngredientsInput } from '../../components/common/Input/CreateIngredientsInput';
+import DragDropImageInput from '../../components/common/DragDropImageInput/DragDropImageInput';
 import FlyingFoods from '../../components/FlyingFoods';
-import MacrosSection from '../../components/MacrosSection';
-import SuccessModal from '../../components/SuccessModal';
-import { IFormErrors, IMacros, IRecipeFormData, IRecipePayload } from '../../types/recipeForm';
-
-const initialMacros: IMacros = { calories: '', protein: '', carbs: '', fat: '' };
+import SuccessModal from '../../components/common/Modal/SuccessModal';
+import MacrosInput from '../../components/common/Input/MacrosInput';
+import { IFormErrors, IMacros, IRecipeFormData } from '../../types/recipeForm';
 
 const RecipeCreate: React.FC = () => {
-  const location = useLocation();
   const navigate = useNavigate();
-  const editingRecipe = location.state?.recipe;
-  const isEditing = Boolean(editingRecipe);
+  const { id } = useParams<{ id: string }>();
+  
+  // Determine if we're in edit mode based on URL parameter
+  const isEditing = Boolean(id);
 
   // Form state
   const [mealName, setMealName] = useState('');
@@ -28,9 +26,10 @@ const RecipeCreate: React.FC = () => {
   const [recipeDetails, setRecipeDetails] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [macros, setMacros] = useState<IMacros>(initialMacros);
+  const [macros, setMacros] = useState<IMacros | undefined>(undefined);
   const [showMacros, setShowMacros] = useState(false);
   const [errors, setErrors] = useState<IFormErrors>({});
+  const [apiError, setApiError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [createdRecipeId, setCreatedRecipeId] = useState<string | null>(null);
@@ -40,99 +39,180 @@ const RecipeCreate: React.FC = () => {
     AOS.init({ duration: 800, once: true });
   }, []);
 
-  // Pre-fill form if editing an existing recipe
+  // Fetch recipe data if in edit mode
   useEffect(() => {
-    if (!editingRecipe) return;
+    if (isEditing && id) {
+      const fetchRecipe = async () => {
+        setIsLoading(true);
+        try {
+          const response = await axios.get(`/api/v1/recipes/${id}`);
+          const recipeData = response.data;
+          
+          // Populate form fields with existing data
+          setMealName(recipeData.mealName || '');
+          setRecipeDetails(recipeData.recipeDetails || '');
+          setIngredientsUsed(Array.isArray(recipeData.ingredientsUsed) ? recipeData.ingredientsUsed : []);
+          
+          // Set macros if they exist and are valid
+          if (recipeData.macros && 
+              typeof recipeData.macros === 'object' && 
+              recipeData.macros !== null) {
+            setMacros(recipeData.macros);
+            setShowMacros(true);
+          }
+          
+          // Set image preview if available
+          if (recipeData.imageUrl) {
+            setImagePreview(recipeData.imageUrl);
+          }
+          
+          // Clear any previous errors
+          setErrors({});
+          setApiError(null);
+        } catch (error) {
+          console.error('Error fetching recipe for editing:', error);
+          setApiError('Failed to load recipe data. Please try again.');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchRecipe();
+    }
+  }, [id, isEditing]);
 
-    setMealName(editingRecipe.mealName || '');
-    
-    // Handle recipe details whether it's a string or an object with instructions.
-    if (typeof editingRecipe.recipeDetails === 'string') {
-      setRecipeDetails(editingRecipe.recipeDetails);
-    } else if (editingRecipe.recipeDetails?.instructions) {
-      setRecipeDetails(editingRecipe.recipeDetails.instructions.join(' '));
+  // Add this validation function
+  const validateIngredient = (ingredient: string): boolean => {
+    // Check if ingredient is just a number or empty
+    if (/^\d+$/.test(ingredient) || ingredient.trim() === '') {
+      return false;
+    }
+    // Ensure ingredient has at least 3 characters
+    return ingredient.trim().length >= 3;
+  };
+
+  // Update the addIngredient function
+  const handleAddIngredient = useCallback(() => {
+    const trimmed = newIngredient.trim();
+    if (!trimmed) {
+      setErrors(prev => ({ ...prev, ingredients: 'Ingredient cannot be empty' }));
+      return;
     }
     
-    setIngredientsUsed(editingRecipe.ingredientsUsed || []);
-    if (editingRecipe.imageUrl) setImagePreview(editingRecipe.imageUrl);
-    // Uncomment if macros are available:
-    // if (editingRecipe.macros) setMacros(editingRecipe.macros);
-  }, [editingRecipe]);
-
-  // Helper: Reset form fields to initial values
-  const resetForm = useCallback(() => {
-    setMealName('');
-    setRecipeDetails('');
-    setIngredientsUsed([]);
+    if (!validateIngredient(trimmed)) {
+      setErrors(prev => ({ 
+        ...prev, 
+        ingredients: 'Invalid ingredient format. Must be at least 3 characters and not just a number.' 
+      }));
+      return;
+    }
+    
+    setIngredientsUsed((prev) => [...prev, trimmed]);
     setNewIngredient('');
-    setImageFile(null);
-    setImagePreview(null);
-    setMacros(initialMacros);
-    setErrors({});
-    setShowMacros(false);
-  }, []);
+    if (errors.ingredients) {
+      setErrors((prev) => ({ ...prev, ingredients: undefined }));
+    }
+  }, [newIngredient, errors.ingredients, validateIngredient]);
 
-  // Helper: Validate form and return error object (if any)
-  const validateForm = useCallback((formData: IRecipeFormData): IFormErrors => {
-    const formErrors: IFormErrors = {};
-    if (!formData.mealName.trim()) {
-      formErrors.mealName = 'Meal Name is required.';
+  // Also update the validateForm function to check all ingredients
+  const validateForm = useCallback((data: IRecipeFormData) => {
+    const errors: Record<string, string> = {};
+    
+    if (!data.mealName.trim()) {
+      errors.mealName = 'Meal name is required';
     }
-    if (formData.ingredientsUsed.length === 0) {
-      formErrors.ingredientsUsed = 'At least one ingredient is required.';
+    
+    if (!data.recipeDetails.trim()) {
+      errors.recipeDetails = 'Recipe details are required';
     }
-    if (!formData.recipeDetails.trim()) {
-      formErrors.recipeDetails = 'Recipe details are required.';
+    
+    if (data.ingredientsUsed.length === 0) {
+      errors.ingredients = 'At least one ingredient is required';
+    } else {
+      // Validate each ingredient
+      const invalidIngredients = data.ingredientsUsed.filter(ing => !validateIngredient(ing));
+      if (invalidIngredients.length > 0) {
+        errors.ingredients = `Some ingredients are invalid: ${invalidIngredients.join(', ')}`;
+      }
     }
-    return formErrors;
+    
+    // Add other validations as needed
+    
+    return errors;
   }, []);
 
   // Handler: Submit form for create or update
   const handleSubmit = useCallback(async () => {
     setSuccessMessage('');
+    setApiError(null);
+    
     const formDataObj: IRecipeFormData = {
       mealName,
       recipeDetails,
       ingredientsUsed,
       imageFile,
-      macros: Object.values(macros).some((val) => val !== '') ? macros : undefined,
+      macros: showMacros ? macros : undefined,
     };
 
     const formErrors = validateForm(formDataObj);
     setErrors(formErrors);
     if (Object.keys(formErrors).length > 0) return;
 
-    // Prepare payload and FormData for submission
-    const recipePayload: IRecipePayload = {
-      mealName,
-      recipeDetails,
-      ingredientsUsed,
-      macros: formDataObj.macros,
-    };
-
-    const formDataToSend = new FormData();
-    formDataToSend.append('request', new Blob([JSON.stringify(recipePayload)], { type: 'application/json' }));
-    if (imageFile) {
-      formDataToSend.append('image', imageFile);
-    }
-
     setIsLoading(true);
     try {
-      if (isEditing && editingRecipe.id) {
-        const response = await axios.put(`/recipes/${editingRecipe.id}`, formDataToSend);
-        console.log('Recipe Updated:', response.data);
-        setSuccessMessage('Your meal was updated successfully!');
-        setCreatedRecipeId(editingRecipe.id);
-      } else {
-        const response = await axios.post('/recipes/create-meal', formDataToSend);
-        console.log('New Recipe Created:', response.data);
-        setSuccessMessage('Your meal was uploaded successfully!');
-        setCreatedRecipeId(response.data.id);
-        resetForm();
+      const formData = new FormData();
+      
+      // Create the recipe data object
+      const recipeData = {
+        mealName,
+        ingredientsUsed,
+        recipeDetails,
+        // Include macros if they're being shown
+        ...(showMacros && macros ? { macros } : {})
+      };
+      
+      // Create a JSON blob with the correct content type
+      const recipeBlob = new Blob([JSON.stringify(recipeData)], {
+        type: 'application/json'
+      });
+      
+      // Add the recipe data as a properly typed part
+      formData.append('request', recipeBlob);
+      
+      // Add the image if available
+      if (imageFile) {
+        formData.append('image', imageFile);
       }
+      
+      let response;
+      
+      if (isEditing && id) {
+        // Update existing recipe
+        response = await axios.put(`/api/v1/recipes/${id}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        setSuccessMessage('Recipe updated successfully!');
+        
+        // Redirect to preview page after a short delay
+        setTimeout(() => {
+          navigate(`/recipes/preview/${id}`);
+        }, 1500); // 1.5 second delay to show success message
+      } else {
+        // Create new recipe
+        response = await axios.post('/api/v1/recipes/create-meal', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        setCreatedRecipeId(response.data.id || null);
+        setSuccessMessage('Recipe created successfully!');
+      }
+      
+      setIsLoading(false);
     } catch (error) {
-      console.error(isEditing ? 'Error updating recipe:' : 'Error creating recipe:', error);
-    } finally {
+      // Handle error
+      console.error('Error with recipe:', error);
+      setApiError(isEditing 
+        ? 'Failed to update recipe. Please try again.' 
+        : 'Failed to create recipe. Please try again.');
       setIsLoading(false);
     }
   }, [
@@ -141,10 +221,11 @@ const RecipeCreate: React.FC = () => {
     ingredientsUsed,
     imageFile,
     macros,
+    showMacros,
     validateForm,
-    resetForm,
     isEditing,
-    editingRecipe,
+    id,
+    navigate,
   ]);
 
   // Handler: File selection for image upload
@@ -153,25 +234,9 @@ const RecipeCreate: React.FC = () => {
     setImagePreview(URL.createObjectURL(file));
   }, []);
 
-  // Handler: Add ingredient to list
-  const handleAddIngredient = useCallback(() => {
-    const trimmed = newIngredient.trim();
-    if (!trimmed) return;
-    setIngredientsUsed((prev) => [...prev, trimmed]);
-    setNewIngredient('');
-    if (errors.ingredientsUsed) {
-      setErrors((prev) => ({ ...prev, ingredientsUsed: undefined }));
-    }
-  }, [newIngredient, errors.ingredientsUsed]);
-
   // Handler: Remove ingredient by index
   const handleRemoveIngredient = useCallback((index: number) => {
     setIngredientsUsed((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  // Handler: Change macro value
-  const handleMacroChange = useCallback((field: string, value: string) => {
-    setMacros((prev) => ({ ...prev, [field as keyof IMacros]: value }));
   }, []);
 
   return (
@@ -182,7 +247,22 @@ const RecipeCreate: React.FC = () => {
           className="relative z-10 bg-white shadow-2xl rounded-3xl p-8 transition-all transform"
           data-aos="fade-up"
         >
-          <HeaderSection />
+          <div className="text-center mb-6">
+            <h2 className="text-3xl font-bold text-dark transition-colors duration-300 hover:text-accent">
+              {isEditing ? 'Edit Recipe' : 'Create a New Recipe'}
+            </h2>
+            <p className="text-secondary">
+              {isEditing ? 'Update your delicious creation!' : 'Share your delicious creation!'}
+            </p>
+          </div>
+          
+          {apiError && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+              <strong className="font-bold">Error: </strong>
+              <span className="block sm:inline">{apiError}</span>
+            </div>
+          )}
+          
           <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
             <TextInput
               label="Meal Name"
@@ -197,10 +277,10 @@ const RecipeCreate: React.FC = () => {
               error={errors.mealName}
               placeholder="e.g. Spiced Chicken Rice Pilaf"
             />
-            <IngredientsInput
+            <CreateIngredientsInput
               ingredientsUsed={ingredientsUsed}
               newIngredient={newIngredient}
-              setNewIngredient={(value) => {
+              setNewIngredient={(value: string) => {
                 setNewIngredient(value);
                 if (errors.ingredientsUsed) {
                   setErrors((prev) => ({ ...prev, ingredientsUsed: undefined }));
@@ -224,16 +304,12 @@ const RecipeCreate: React.FC = () => {
               placeholder="Describe the preparation steps..."
             />
             <DragDropImageInput imagePreview={imagePreview} onFileSelect={handleFileSelection} />
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={() => setShowMacros((prev) => !prev)}
-                className="w-full py-2 bg-blue-500 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-600 transition"
-              >
-                {showMacros ? 'Hide Macros' : 'Add Macros (optional)'}
-              </button>
-              {showMacros && <MacrosSection macros={macros} onChange={handleMacroChange} />}
-            </div>
+            <MacrosInput
+              macros={macros}
+              setMacros={setMacros}
+              showMacros={showMacros}
+              setShowMacros={setShowMacros}
+            />
             <button
               type="button"
               onClick={handleSubmit}
@@ -253,7 +329,7 @@ const RecipeCreate: React.FC = () => {
                   {isEditing ? 'Updating...' : 'Creating...'}
                 </span>
               ) : (
-                isEditing ? 'Edit Recipe' : 'Create Recipe'
+                isEditing ? 'Update Recipe' : 'Create Recipe'
               )}
             </button>
           </form>

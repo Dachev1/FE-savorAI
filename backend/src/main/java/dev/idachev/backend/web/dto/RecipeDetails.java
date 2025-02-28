@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
 @Schema(description = "Detailed information about the recipe.")
-public record RecipeDetails(
+public record   RecipeDetails(
         @Schema(description = "Detailed list of ingredients with quantities.", example = "[\"4 chicken breasts\", \"3 cloves garlic, minced\"]")
         List<String> ingredientsList,
 

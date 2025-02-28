@@ -35,8 +35,9 @@ public class Recipe {
 
     private String imageUrl;
 
+    //TODO THIS COLUMN CANNOT BE NULL(FOR NOW IS NULL FOR TESTING)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by_id", nullable = false)
+    @JoinColumn(name = "created_by_id")
     private User createdBy;
 
     @OneToOne(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)

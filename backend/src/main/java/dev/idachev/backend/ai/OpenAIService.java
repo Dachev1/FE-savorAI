@@ -69,26 +69,11 @@ public class OpenAIService {
         }
     }
 
-    public JsonNode generateRecipeJsonByName(final String recipeName) {
-
-        try {
-
-            String promptText = String.format(PromptTemplates.RECIPE_BY_NAME_PROMPT, recipeName);
-            String responseContent = fetchAIResponse(promptText);
-
-            return parseJsonContent(responseContent);
-        } catch (Exception e) {
-
-            log.error("Failed to generate recipe JSON for recipe name: {}", recipeName, e);
-
-            throw new AIGenerationException("Failed to generate recipe by name. Please try again later.", e);
-        }
-    }
-
     /**
      * Generates a recipe image synchronously and blocks until the image is generated.
      */
     public String generateRecipeImage(final String mealName) {
+
         try {
             String imagePromptText = String.format("Professional food photography of %s, on a beautiful plate, restaurant quality, high resolution", mealName);
 

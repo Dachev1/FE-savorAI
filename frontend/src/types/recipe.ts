@@ -1,5 +1,5 @@
 export interface NutritionalInformation {
-    calories: number;
+    calories: string;
     protein: string;
     carbohydrates: string;
     fat: string;
@@ -14,10 +14,18 @@ export interface NutritionalInformation {
   }
   
   export interface RecipeResponse {
+    id?: string;
     mealName: string;
+    imageUrl?: string;
     ingredientsUsed: string[];
-    recipeDetails: RecipeDetails;
-    imageUrl: string;
+    recipeDetails: RecipeDetails | string;
+    aiGenerated: boolean;
+    macros?: {
+      calories?: number;
+      protein?: number;
+      carbs?: number;
+      fat?: number;
+    };
   }
   
   export type GeneratedMealResponse = RecipeResponse;

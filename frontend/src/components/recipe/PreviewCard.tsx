@@ -1,5 +1,5 @@
 import React from 'react';
-import { RecipeResponse } from '../types/recipe';
+import { RecipeResponse } from '../../types/recipe';
 
 interface PreviewCardProps {
   recipe: RecipeResponse;

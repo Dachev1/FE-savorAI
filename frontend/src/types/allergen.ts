@@ -1,4 +1,4 @@
-import { Allergen } from '../constants/commonAllergens';
+import { Allergen } from '../constants/allergens';
 
 export interface AllergenContainerProps {
   children: React.ReactNode;
@@ -15,7 +15,7 @@ export interface AllergenFormProps {
 }
 
 export interface AllergenFooterProps {
-  onSave: () => void;
   loading: boolean;
+  onSave: () => void;
   formError: string;
 }

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
-import { Allergen, COMMON_ALLERGENS } from '../constants/commonAllergens';
+import { Allergen, COMMON_ALLERGENS } from '../constants/allergens';
 import { AllergenContainerProps, AllergenFormProps, AllergenFooterProps } from '../types/allergen';
 
 const AllergenSetup: React.FC = () => {

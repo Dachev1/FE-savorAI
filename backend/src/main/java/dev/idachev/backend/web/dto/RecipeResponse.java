@@ -9,5 +9,6 @@ public record RecipeResponse(
         List<String> ingredientsUsed,
         String recipeDetails,
         String imageUrl,
-        boolean aiGenerated
+        boolean aiGenerated,
+        MacrosData macros
 ) {}
