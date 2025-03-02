@@ -19,7 +19,7 @@ export interface NutritionalInformation {
     imageUrl?: string;
     ingredientsUsed: string[];
     recipeDetails: RecipeDetails | string;
-    aiGenerated: boolean;
+    aiGenerated?: boolean;
     macros?: {
       calories?: number;
       protein?: number;

@@ -1,3 +1,203 @@
 @tailwind base;
 @tailwind components;
-@tailwind utilities; 
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-dark: #1A1A1A;
+    --color-light: #FAFAFA;
+    --color-accent: #0071E3;
+    --color-secondary: #6E6E73;
+    --color-softGray: #F5F5F7;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-light text-dark transition-all duration-300 ease-apple-ease;
+    font-feature-settings: 'kern';
+    font-kerning: normal;
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body.dark {
+    @apply bg-dark text-light;
+  }
+  
+  /* Improved typography */
+  h1 {
+    @apply text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight;
+    @apply mb-4 md:mb-6;
+  }
+  
+  h2 {
+    @apply text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight;
+    @apply mb-3 md:mb-5;
+  }
+  
+  h3 {
+    @apply text-xl sm:text-2xl font-semibold tracking-tight;
+    @apply mb-2 md:mb-4;
+  }
+  
+  h4, h5, h6 {
+    @apply text-lg font-semibold tracking-tight;
+    @apply mb-2;
+  }
+  
+  p {
+    @apply leading-relaxed mb-4;
+  }
+  
+  a:focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 rounded-sm;
+  }
+  
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    @apply w-1.5 h-1.5;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-200 dark:bg-gray-800;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-400 dark:bg-gray-600 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500 dark:bg-gray-500;
+  }
+  
+  /* Focus styles */
+  :focus {
+    @apply outline-none;
+  }
+}
+
+@layer components {
+  /* Enhanced button styles */
+  .btn-primary {
+    @apply px-4 py-2.5 bg-accent hover:bg-accent-hover active:bg-accent-dark text-white rounded-xl;
+    @apply font-medium text-center transition-all duration-300 ease-apple-ease;
+    @apply shadow-soft hover:shadow-medium active:scale-[0.98];
+    @apply focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2;
+    @apply disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-accent disabled:hover:shadow-soft disabled:active:scale-100;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2.5 bg-softGray hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-dark dark:text-light rounded-xl;
+    @apply font-medium text-center transition-all duration-300 ease-apple-ease;
+    @apply shadow-soft hover:shadow-medium active:scale-[0.98];
+    @apply focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2;
+    @apply disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-softGray dark:disabled:hover:bg-gray-800 disabled:active:scale-100;
+  }
+
+  .btn-outline {
+    @apply px-4 py-2.5 bg-transparent border border-gray-200 dark:border-gray-700 text-dark dark:text-light rounded-xl;
+    @apply hover:bg-softGray dark:hover:bg-gray-800 font-medium text-center transition-all duration-300 ease-apple-ease;
+    @apply focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2;
+    @apply disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-transparent;
+  }
+  
+  .btn-text {
+    @apply px-4 py-2 bg-transparent text-accent hover:text-accent-hover dark:text-accent dark:hover:text-accent-hover;
+    @apply font-medium text-center transition-colors duration-300 ease-apple-ease;
+    @apply focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 rounded-lg;
+  }
+
+  /* Enhanced card styles */
+  .card {
+    @apply bg-white dark:bg-gray-800 rounded-2xl shadow-soft;
+    @apply border border-gray-100 dark:border-gray-700;
+    @apply transition-all duration-300 ease-apple-ease;
+    @apply hover:shadow-medium;
+  }
+  
+  .card-glass {
+    @apply bg-white/80 dark:bg-gray-800/70 backdrop-blur-md;
+    @apply rounded-2xl shadow-soft;
+    @apply border border-white/20 dark:border-gray-700/30;
+    @apply transition-all duration-300 ease-apple-ease;
+  }
+
+  /* Enhanced form elements */
+  .input {
+    @apply px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700;
+    @apply bg-white dark:bg-gray-800 text-dark dark:text-light;
+    @apply transition-all duration-300 ease-apple-ease;
+    @apply focus:border-accent dark:focus:border-accent focus:ring-2 focus:ring-accent/20 dark:focus:ring-accent/20 focus:outline-none;
+    @apply disabled:opacity-60 disabled:cursor-not-allowed;
+    @apply placeholder:text-gray-400 dark:placeholder:text-gray-500;
+  }
+  
+  .label {
+    @apply block mb-1.5 text-sm font-medium text-secondary-dark dark:text-gray-300;
+  }
+  
+  .checkbox {
+    @apply w-5 h-5 rounded border border-gray-300 dark:border-gray-600;
+    @apply text-accent transition-colors duration-300 ease-apple-ease;
+    @apply focus:ring-2 focus:ring-accent/50 focus:ring-offset-0 focus:outline-none;
+  }
+  
+  .select {
+    @apply px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700;
+    @apply bg-white dark:bg-gray-800 text-dark dark:text-light;
+    @apply transition-all duration-300 ease-apple-ease;
+    @apply focus:border-accent dark:focus:border-accent focus:ring-2 focus:ring-accent/20 dark:focus:ring-accent/20 focus:outline-none;
+  }
+}
+
+/* Animation utilities */
+@layer utilities {
+  .appear {
+    @apply animate-fade-in;
+  }
+  
+  .slide-up {
+    @apply animate-slide-up;
+  }
+  
+  .slide-down {
+    @apply animate-slide-down;
+  }
+  
+  .scale-in {
+    @apply animate-scale-in;
+  }
+  
+  .fade-in {
+    opacity: 0;
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+  
+  .fade-in-delay-1 {
+    opacity: 0;
+    animation: fadeIn 0.5s ease-out 0.1s forwards;
+  }
+  
+  .fade-in-delay-2 {
+    opacity: 0;
+    animation: fadeIn 0.5s ease-out 0.2s forwards;
+  }
+  
+  .fade-in-delay-3 {
+    opacity: 0;
+    animation: fadeIn 0.5s ease-out 0.3s forwards;
+  }
+}
+
+/* Dark mode toggle with improved styling */
+.dark-mode-toggle {
+  @apply fixed right-4 top-4 z-50 p-2.5 bg-white/90 dark:bg-gray-800/90 rounded-full shadow-medium cursor-pointer;
+  @apply backdrop-blur-sm border border-gray-100 dark:border-gray-700;
+  @apply hover:shadow-medium transition-all duration-300 ease-apple-ease;
+  @apply focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2;
+} 

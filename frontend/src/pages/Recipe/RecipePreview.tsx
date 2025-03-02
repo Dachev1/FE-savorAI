@@ -11,6 +11,7 @@ const RecipePreview: React.FC = () => {
   const [recipe, setRecipe] = useState<RecipeResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showMacros, setShowMacros] = useState(false);
 
   useEffect(() => {
     const fetchRecipe = async () => {
@@ -30,12 +31,6 @@ const RecipePreview: React.FC = () => {
       fetchRecipe();
     }
   }, [id]);
-
-  const handleEdit = () => {
-    if (recipe) {
-      navigate(`/recipes/edit/${id}`, { state: { recipe } });
-    }
-  };
 
   if (isLoading) {
     return (
@@ -82,12 +77,6 @@ const RecipePreview: React.FC = () => {
           <div className="p-6 md:p-8">
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-3xl font-bold text-gray-900">{recipe.mealName}</h1>
-              <button
-                onClick={handleEdit}
-                className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-dark transition-colors"
-              >
-                Edit Recipe
-              </button>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -101,9 +90,6 @@ const RecipePreview: React.FC = () => {
                     </li>
                   ))}
                 </ul>
-                
-                {/* Display macros if available */}
-                {recipe.macros && <MacrosDisplay macros={recipe.macros} />}
               </div>
               
               <div>
@@ -115,13 +101,44 @@ const RecipePreview: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {recipe.macros && showMacros && (
+              <div className="mt-8 flex justify-center">
+                <MacrosDisplay macros={recipe.macros} />
+              </div>
+            )}
           </div>
         </div>
         
-        <div className="mt-6 text-center">
-          <Link to="/" className="inline-block px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
-            Back to Home
-          </Link>
+        <div className="mt-6 text-center space-y-4">
+          <div className="flex justify-center space-x-4">
+            <button
+              onClick={() => navigate(`/recipes/edit/${id}`)}
+              className="px-4 py-2 bg-accent hover:bg-accent-dark text-white font-bold rounded focus:outline-none focus:shadow-outline transition duration-300"
+            >
+              Edit Recipe
+            </button>
+            
+            <button
+              onClick={() => setShowMacros(!showMacros)}
+              className="px-4 py-2 bg-secondary hover:bg-secondary-dark text-white font-bold rounded focus:outline-none focus:shadow-outline transition duration-300"
+            >
+              {showMacros ? 'Hide Macros' : 'Show Macros'}
+            </button>
+            
+            <button
+              onClick={() => navigate('/recipes/create')}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded focus:outline-none focus:shadow-outline transition duration-300"
+            >
+              Create New Recipe
+            </button>
+          </div>
+          
+          <div>
+            <Link to="/" className="inline-block px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+              Back to Home
+            </Link>
+          </div>
         </div>
       </div>
     </div>
