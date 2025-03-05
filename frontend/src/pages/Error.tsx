@@ -4,33 +4,11 @@ import { Link } from 'react-router-dom';
 const Error: React.FC = () => {
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-4">
-      <div className="mb-8">
-        <h1 className="text-9xl font-bold text-accent">404</h1>
-        <div className="h-1 w-24 bg-accent mx-auto my-4"></div>
-      </div>
-      
-      <h2 className="text-3xl md:text-4xl font-bold mb-4 text-dark dark:text-light">Page Not Found</h2>
-      <p className="text-lg text-secondary dark:text-gray-300 mb-8 max-w-md">
-        The page you are looking for might have been removed, had its name changed, 
-        or is temporarily unavailable.
-      </p>
-      
-      <div className="flex flex-col sm:flex-row gap-4">
-        <Link
-          to="/"
-          className="px-6 py-3 bg-accent hover:bg-blue-600 text-white rounded-lg 
-          transition-colors duration-300 text-center"
-        >
-          Go to Homepage
-        </Link>
-        <Link
-          to="/contact"
-          className="px-6 py-3 bg-softGray hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600
-          text-dark dark:text-white rounded-lg transition-colors duration-300 text-center"
-        >
-          Contact Support
-        </Link>
-      </div>
+      <BackgroundEffects />
+      <BreadIllustration />
+      <TitleSection />
+      <FunButtons />
+      <CheerUpBread />
     </div>
   );
 };

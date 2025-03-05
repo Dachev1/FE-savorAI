@@ -35,6 +35,9 @@ public class Recipe {
 
     private String imageUrl;
 
+    // Added preparation time in minutes
+    private Integer prepTimeMinutes;
+
     //TODO THIS COLUMN CANNOT BE NULL(FOR NOW IS NULL FOR TESTING)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_id")

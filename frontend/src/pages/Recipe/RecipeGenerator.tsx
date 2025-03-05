@@ -7,6 +7,7 @@ import { NutritionalInformation } from '../../types/recipe';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 import { useToast } from '../../context/ToastContext';
+import { ToastType } from '../../components/common/Toast';
 
 interface RecipeDetails {
   ingredientsList: string[];
@@ -99,7 +100,7 @@ Fat: ${details.nutritionalInformation.fat}
 
   const handleToggleFavorite = useCallback(() => {
     setIsFavorite(prev => !prev);
-    showToast(isFavorite ? 'Removed from favorites' : 'Added to favorites', 'info');
+    showToast(isFavorite ? 'Removed from favorites' : 'Added to favorites', 'favorite');
   }, [isFavorite, showToast]);
 
   const handleSubmit = useCallback(
@@ -139,9 +140,7 @@ Fat: ${details.nutritionalInformation.fat}
           ...response.data,
           recipeDetails: {
             ...response.data.recipeDetails,
-            // Remove numeric prefixes from instructions
             instructions: response.data.recipeDetails.instructions.map(instruction => {
-              // Remove patterns like "1. ", "2. ", "Step 1: ", etc.
               return instruction.replace(/^(\d+\.|\d+\)|\d+|Step \d+:)\s+/i, '');
             }),
             nutritionalInformation: {

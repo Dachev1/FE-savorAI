@@ -20,6 +20,7 @@ export interface NutritionalInformation {
     ingredientsUsed: string[];
     recipeDetails: RecipeDetails | string;
     aiGenerated?: boolean;
+    prepTimeMinutes?: number;
     macros?: {
       calories?: number;
       protein?: number;

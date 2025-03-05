@@ -1,19 +1,14 @@
 import { useEffect } from 'react';
-import AOS from 'aos';
+import AOS, { AosOptions } from 'aos';
 import 'aos/dist/aos.css';
 
-interface AOSOptions {
-  duration?: number;
-  easing?: string;
-  once?: boolean;
-  delay?: number;
-}
+interface AOSOptions extends AosOptions {}
 
 export const useAOS = (options: AOSOptions = {}) => {
   useEffect(() => {
     AOS.init({
       duration: 800,
-      easing: 'ease-in-out',
+      easing: 'ease',
       once: true,
       ...options
     });

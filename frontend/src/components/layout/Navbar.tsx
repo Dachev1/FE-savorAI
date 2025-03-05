@@ -2,14 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import DarkModeToggle from '../common/DarkModeToggle';
-import { useDarkMode } from '../../context/DarkModeContext';
+import { FaPlus } from 'react-icons/fa';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { isAuthenticated, logout } = useAuth();
   const location = useLocation();
-  const { isDarkMode } = useDarkMode();
 
   // Update scroll state on scroll
   useEffect(() => {
@@ -55,6 +54,14 @@ const Navbar: React.FC = () => {
               >
                 Recipe Generator
               </NavLink>
+              
+              {/* Create Recipe Button - Desktop (visible to everyone) */}
+              <Link
+                to="/recipe/create"
+                className="px-4 py-2 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors flex items-center"
+              >
+                <FaPlus className="mr-2" /> Create Recipe
+              </Link>
               
               {isAuthenticated ? (
                 <>
@@ -157,6 +164,15 @@ const Navbar: React.FC = () => {
           >
             Recipe Generator
           </MobileNavLink>
+          
+          {/* Create Recipe Button - Mobile (visible to everyone) */}
+          <Link
+            to="/recipe/create"
+            className="block w-full px-3 py-2 my-1 rounded-md text-base font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 flex items-center justify-center"
+            onClick={() => setIsOpen(false)}
+          >
+            <FaPlus className="mr-2" /> Create Recipe
+          </Link>
           
           {isAuthenticated ? (
             <>

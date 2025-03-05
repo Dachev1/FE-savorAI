@@ -2,6 +2,7 @@ export interface IFormErrors {
     mealName?: string;
     ingredientsUsed?: string;
     recipeDetails?: string;
+    prepTimeMinutes?: string;
     [key: string]: string | undefined;
   }
   
@@ -17,6 +18,7 @@ export interface IFormErrors {
     recipeDetails: string;
     ingredientsUsed: string[];
     imageFile: File | null;
+    prepTimeMinutes?: number;
     macros?: IMacros;
   }
   
@@ -24,6 +26,7 @@ export interface IFormErrors {
     mealName: string;
     recipeDetails: string;
     ingredientsUsed: string[];
+    prepTimeMinutes?: number;
     macros?: IMacros;
   }
   

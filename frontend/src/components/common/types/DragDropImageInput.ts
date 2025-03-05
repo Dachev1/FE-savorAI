@@ -1,4 +1,4 @@
 export interface DragDropImageInputProps {
   imagePreview: string | null;
-  onFileSelect: (file: File) => void;
+  onFileSelect: (file: File | null) => void;
 } 

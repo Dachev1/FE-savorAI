@@ -25,28 +25,22 @@ const PageTransition: React.FC<PageTransitionProps> = ({
   className = '',
 }) => {
   const location = useLocation();
-  const [displayChildren, setDisplayChildren] = useState(children);
   const [transitionStage, setTransitionStage] = useState('fadeIn');
   
+  // Only trigger transitions on route change, not on every re-render
   useEffect(() => {
-    // When location changes, trigger the exit animation
-    if (displayChildren !== children) {
-      setTransitionStage('fadeOut');
-      
-      // After the exit animation, update children and trigger enter animation
-      const timeout = setTimeout(() => {
-        setDisplayChildren(children);
-        setTransitionStage('fadeIn');
-      }, duration);
-      
-      return () => clearTimeout(timeout);
-    }
-  }, [children, displayChildren, duration]);
-  
-  // Update children when location changes
-  useEffect(() => {
-    setDisplayChildren(children);
-  }, [location.pathname, children]);
+    // When location path changes, trigger the exit animation
+    setTransitionStage('fadeOut');
+    
+    // After the exit animation, update children and trigger enter animation
+    const timeout = setTimeout(() => {
+      setTransitionStage('fadeIn');
+    }, duration);
+    
+    return () => clearTimeout(timeout);
+    
+    // Only depend on location.pathname, not children
+  }, [location.pathname, duration]);
   
   // Generate the transition styles based on type
   const getTransitionStyles = (stage: string) => {
@@ -104,7 +98,7 @@ const PageTransition: React.FC<PageTransitionProps> = ({
       className={className}
       style={getTransitionStyles(transitionStage)}
     >
-      {displayChildren}
+      {children}
     </div>
   );
 };

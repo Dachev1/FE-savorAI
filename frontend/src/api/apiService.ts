@@ -1,5 +1,6 @@
 import axios from './axiosConfig';
-import { Recipe, RecipeForm, User, RegisterData, LoginData } from '../types';
+import { RecipeResponse as Recipe, IRecipeFormData as RecipeForm } from '../types';
+import { User, RegisterData, LoginData } from '../types/auth';
 
 // Auth API
 export const authAPI = {

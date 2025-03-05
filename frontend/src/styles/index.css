@@ -1,3 +1,6 @@
+/* Import custom animations - must come before other CSS */
+@import './animations.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

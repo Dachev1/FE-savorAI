@@ -15,7 +15,9 @@ const LearnMore = React.lazy(() => import('./pages/LearnMore.tsx'));
 const AllergenSetup = React.lazy(() => import('./pages/AllergenSetup.tsx'));
 const RecipeCreate = React.lazy(() => import('./pages/Recipe/RecipeCreate.tsx'));
 const RecipeDetail = React.lazy(() => import('./pages/Recipe/RecipeDetail.tsx'));
+const RecipePreview = React.lazy(() => import('./pages/Recipe/RecipePreview.tsx'));
 const RecipeGenerator = React.lazy(() => import('./pages/Recipe/RecipeGenerator.tsx'));
+const UserRecipes = React.lazy(() => import('./pages/Recipe/UserRecipes.tsx'));
 const Error = React.lazy(() => import('./pages/Error.tsx'));
 
 // Protected route component
@@ -62,6 +64,7 @@ const App: React.FC = () => {
         <Route path="/learn-more" element={<LearnMore />} />
         <Route path="/recipes/:id" element={<RecipeDetail />} />
         <Route path="/recipe/generator" element={<RecipeGenerator />} />
+        <Route path="/recipe/create" element={<RecipeCreate />} />
         
         {/* Protected routes */}
         <Route path="/allergen-setup" element={
@@ -69,14 +72,19 @@ const App: React.FC = () => {
             <AllergenSetup />
           </ProtectedRoute>
         } />
-        <Route path="/recipes/create" element={
+        <Route path="/recipes/edit/:id" element={
           <ProtectedRoute>
             <RecipeCreate />
           </ProtectedRoute>
         } />
-        <Route path="/recipes/edit/:id" element={
+        <Route path="/recipes/preview/:id" element={
           <ProtectedRoute>
-            <RecipeCreate />
+            <RecipePreview />
+          </ProtectedRoute>
+        } />
+        <Route path="/recipes" element={
+          <ProtectedRoute>
+            <UserRecipes />
           </ProtectedRoute>
         } />
         

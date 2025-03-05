@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { FaHeart } from 'react-icons/fa';
 
-export type ToastType = 'success' | 'error' | 'warning' | 'info';
+export type ToastType = 'success' | 'error' | 'warning' | 'info' | 'favorite';
 
 export interface ToastProps {
   id: string;
@@ -41,6 +42,9 @@ const Toast: React.FC<ToastProps> = ({ id, message, type, duration = 4000, onClo
         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zm-1 7a1 1 0 100 2h.01a1 1 0 100-2H10z" clipRule="evenodd" />
       </svg>
     ),
+    favorite: (
+      <FaHeart className="h-6 w-6" />
+    ),
   };
   
   // Color scheme for different toast types
@@ -49,6 +53,7 @@ const Toast: React.FC<ToastProps> = ({ id, message, type, duration = 4000, onClo
     error: 'bg-red-600 text-white',
     warning: 'bg-yellow-500 text-dark',
     info: 'bg-blue-600 text-white',
+    favorite: 'bg-red-500 text-white',
   };
   
   // Animation timing
