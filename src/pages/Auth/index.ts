@@ -1,3 +1,3 @@
 export { default as SignIn } from './SignIn';
 export { default as SignUp } from './SignUp';
-export { default as RegistrationSuccess } from './RegistrationSuccess'; 
+export { default as SignupSuccess } from './SignupSuccess'; 

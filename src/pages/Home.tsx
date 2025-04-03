@@ -1,4 +1,4 @@
-import React, { useEffect, memo, useState } from 'react';
+import React, { useEffect, memo, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
@@ -273,29 +273,83 @@ UnauthenticatedHome.displayName = 'UnauthenticatedHome';
 
 // Main home component
 const Home: React.FC = () => {
-  const { isAuthenticated } = useAuth();
-
-  // Initialize AOS once on mount
+  const { isAuthenticated, user, isLoading } = useAuth();
+  const [authState, setAuthState] = useState({ isAuthenticated, user });
+  const prevAuthStateRef = useRef({ isAuthenticated, user });
+  const authChangeCountRef = useRef(0);
+  
+  // Update local auth state when global auth state changes, with optimization
   useEffect(() => {
-    AOS.init({
-      duration: 800,
-      easing: 'ease-out-cubic',
-      once: false,
-      mirror: true,
-      disable: window.innerWidth < 768 // Disable on mobile for better performance
-    });
+    // Only update if auth state actually changed
+    const userIdChanged = prevAuthStateRef.current.user?.id !== user?.id;
+    const authStatusChanged = prevAuthStateRef.current.isAuthenticated !== isAuthenticated;
     
-    // Clean up AOS on unmount
+    if (userIdChanged || authStatusChanged) {
+      // Update local state for component 
+      setAuthState({ isAuthenticated, user });
+      prevAuthStateRef.current = { isAuthenticated, user };
+      
+      // Rate-limit logging to prevent console spam
+      if (import.meta.env.DEV && authChangeCountRef.current < 3) {
+        console.log('Home - Auth state changed:', { 
+          isAuthenticated, 
+          user: user ? {...user, password: undefined} : null,
+          changeCount: ++authChangeCountRef.current
+        });
+      }
+    }
+  }, [isAuthenticated, user]);
+  
+  // Handle global auth state change events
+  useEffect(() => {
+    const handleAuthChange = (event: Event) => {
+      // Extract auth details from the event if available
+      const customEvent = event as CustomEvent;
+      const newAuthState = customEvent.detail?.authenticated;
+      
+      // Only update state if there's a real change from the event
+      if (prevAuthStateRef.current.isAuthenticated !== newAuthState) {
+        setAuthState(prev => ({ 
+          ...prev, 
+          isAuthenticated: newAuthState 
+        }));
+        prevAuthStateRef.current.isAuthenticated = newAuthState;
+      }
+    };
+    
+    window.addEventListener('auth-state-changed', handleAuthChange);
+    return () => window.removeEventListener('auth-state-changed', handleAuthChange);
+  }, []);
+  
+  // Reset change counter when component unmounts/remounts
+  useEffect(() => {
     return () => {
-      // No official cleanup method for AOS, but we can reset elements
-      document.querySelectorAll('[data-aos]').forEach(el => {
-        el.removeAttribute('data-aos-animate');
-      });
+      authChangeCountRef.current = 0;
     };
   }, []);
-
-  // Show different home page based on authentication status
-  return isAuthenticated ? <AuthenticatedHome /> : <UnauthenticatedHome />;
+  
+  useEffect(() => {
+    // Initialize AOS animations
+    AOS.init({
+      duration: 800,
+      once: true,
+      mirror: false
+    });
+  }, []);
+  
+  // Show loading state while authentication is being checked
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+  
+  // Render the appropriate home page based on auth state
+  return authState.isAuthenticated ? <AuthenticatedHome /> : <UnauthenticatedHome />;
 };
+
+Home.displayName = 'Home';
 
 export default memo(Home); 

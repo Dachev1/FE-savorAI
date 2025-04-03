@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import axios from '../../api/axiosConfig.tsx';
 import { AxiosError, isAxiosError } from 'axios';
 import RecipeCard from '../../components/recipe/AIGeneratedMealCard';
 import IngredientsInput from '../../components/GeneratorIngredientsInput';
@@ -7,7 +6,8 @@ import { NutritionalInformation } from '../../types/recipe';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 import { useToast } from '../../context/ToastContext';
-import { ToastType } from '../../components/common/Toast';
+import favoriteService from '../../services/favoriteService';
+import axiosInstance from '../../api/axiosConfig';
 
 interface RecipeDetails {
   ingredientsList: string[];
@@ -18,6 +18,7 @@ interface RecipeDetails {
 }
 
 interface RecipeResponse {
+  id?: string;
   mealName: string;
   ingredientsUsed: string[];
   recipeDetails: RecipeDetails;
@@ -55,6 +56,27 @@ const RecipeGenerator: React.FC = () => {
     };
   }, []);
 
+  // Check favorite status when recipe changes
+  useEffect(() => {
+    if (!recipe?.id) {
+      setIsFavorite(false);
+      return;
+    }
+    
+    const checkFavoriteStatus = async () => {
+      try {
+        // We've already checked that recipe.id exists above
+        const recipeId = recipe.id as string;
+        const isFav = await favoriteService.checkFavorite(recipeId);
+        setIsFavorite(isFav);
+      } catch (error) {
+        console.error('Error checking favorite status:', error);
+      }
+    };
+
+    checkFavoriteStatus();
+  }, [recipe?.id]);
+
   // -----------------------------
   // Callbacks
   // -----------------------------
@@ -81,27 +103,43 @@ Fat: ${details.nutritionalInformation.fat}
   }, []);
 
   const handleCopyToClipboard = useCallback(() => {
-    if (recipe?.recipeDetails) {
-      navigator.clipboard
-        .writeText(formatRecipeDetails(recipe.recipeDetails as RecipeDetails))
-        .then(() => {
-          setCopySuccess('Recipe details copied to clipboard!');
-          showToast('Recipe details copied to clipboard!', 'success');
-        })
-        .catch(() => {
-          setCopySuccess('Failed to copy recipe details.');
-          showToast('Failed to copy recipe details.', 'error');
-        });
+    if (!recipe?.recipeDetails) return;
 
-      // Reset copy success message after 3 seconds
-      copyTimeoutRef.current = window.setTimeout(() => setCopySuccess(''), 3000);
-    }
+    navigator.clipboard
+      .writeText(formatRecipeDetails(recipe.recipeDetails as RecipeDetails))
+      .then(() => {
+        setCopySuccess('Recipe details copied to clipboard!');
+        showToast('Recipe details copied to clipboard!', 'success');
+      })
+      .catch(() => {
+        showToast('Failed to copy recipe details.', 'error');
+      });
+
+    copyTimeoutRef.current = window.setTimeout(() => setCopySuccess(''), 3000);
   }, [recipe, formatRecipeDetails, showToast]);
 
-  const handleToggleFavorite = useCallback(() => {
-    setIsFavorite(prev => !prev);
-    showToast(isFavorite ? 'Removed from favorites' : 'Added to favorites', 'favorite');
-  }, [isFavorite, showToast]);
+  const handleToggleFavorite = useCallback(async () => {
+    if (!recipe) {
+      showToast('No recipe to save', 'error');
+      return;
+    }
+
+    try {
+      if (!recipe.id) {
+        const recipeId = await favoriteService.saveGeneratedRecipe(recipe);
+        setRecipe(prev => prev ? {...prev, id: recipeId} : null);
+        setIsFavorite(true);
+        showToast('Recipe added to favorites!', 'favorite');
+      } else {
+        const newFavoriteStatus = await favoriteService.toggleFavorite(recipe.id);
+        setIsFavorite(newFavoriteStatus);
+        showToast(newFavoriteStatus ? 'Added to favorites' : 'Removed from favorites', 'favorite');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      showToast('Failed to save to favorites. Please try again.', 'error');
+    }
+  }, [recipe, showToast]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
@@ -129,25 +167,50 @@ Fat: ${details.nutritionalInformation.fat}
         return;
       }
 
+      // Check if user is authenticated
+      const token = localStorage.getItem('auth_token');
+      
+      if (!token) {
+        showToast('Please log in to generate recipes.', 'error');
+        setLoading(false);
+        return;
+      }
+
       try {
-        // Call the backend API
-        const response = await axios.post<RecipeResponse>('/v1/recipes/generate-meal', {
-          ingredients: ingredientsArray,
-        });
+        // Use axios instance instead of fetch for consistent auth handling
+        const response = await axiosInstance.post('/v1/recipes/generate', ingredientsArray);
+        const data = response.data;
         
-        // Process the response data
-        const recipeData = {
-          ...response.data,
+        // Transform the API response to match the expected format
+        const recipeData: GeneratedMealResponse = {
+          mealName: data.title || 'Unnamed Recipe',
+          ingredientsUsed: data.ingredients || [],
+          imageUrl: data.imageUrl || '',
           recipeDetails: {
-            ...response.data.recipeDetails,
-            instructions: response.data.recipeDetails.instructions.map(instruction => {
-              return instruction.replace(/^(\d+\.|\d+\)|\d+|Step \d+:)\s+/i, '');
-            }),
+            // Use the same ingredients list
+            ingredientsList: data.ingredients || [],
+            
+            // Extract equipment needed from instructions or provide empty
+            equipmentNeeded: [],
+            
+            // Split the instructions string into an array by newline and clean up
+            instructions: data.instructions 
+              ? data.instructions.split('\n').map((instruction: string) => {
+                  return instruction.trim().replace(/^(\d+\.|\d+\)|\d+|Step \d+:)\s+/i, '');
+                })
+              : [],
+            
+            // Format serving suggestions more nicely - make it a complete paragraph
+            servingSuggestions: data.description 
+              ? [data.description.trim()] 
+              : ['Enjoy your meal!'],
+            
+            // Map macros to nutritional information
             nutritionalInformation: {
-              calories: String(response.data.recipeDetails.nutritionalInformation?.calories || ''),
-              protein: String(response.data.recipeDetails.nutritionalInformation?.protein || ''),
-              carbohydrates: String(response.data.recipeDetails.nutritionalInformation?.carbohydrates || ''),
-              fat: String(response.data.recipeDetails.nutritionalInformation?.fat || ''),
+              calories: String(data.macros?.calories || ''),
+              protein: String(data.macros?.proteinGrams || '') + 'g',
+              carbohydrates: String(data.macros?.carbsGrams || '') + 'g',
+              fat: String(data.macros?.fatGrams || '') + 'g',
             },
           },
         };
@@ -155,74 +218,79 @@ Fat: ${details.nutritionalInformation.fat}
         setRecipe(recipeData);
         showToast('Recipe generated successfully!', 'success');
       } catch (err: unknown) {
-        console.error('Error generating recipe:', err);
-        
-        if (isAxiosError(err)) {
-          const axiosError = err as AxiosError<any>;
-          
-          // Check for friendlyMessage first (highest priority)
-          if ((axiosError as any).friendlyMessage) {
-            showToast((axiosError as any).friendlyMessage, 'error', 6000);
-            return;
-          }
-          
-          // Then check for response.data.friendlyMessage
-          if (axiosError.response?.data?.friendlyMessage) {
-            showToast(axiosError.response.data.friendlyMessage, 'error', 6000);
-            return;
-          }
-          
-          // Handle response errors
-          if (axiosError.response) {
-            let errorMessage = '';
-            
-            switch (axiosError.response.status) {
-              case 400:
-                errorMessage = 'Please check your ingredients and try again. Try specific ingredients like "chicken, rice, tomatoes".';
-                break;
-              case 401:
-                errorMessage = 'Your session has expired. Please log in again to continue.';
-                break;
-              case 403:
-                errorMessage = 'This feature requires authentication. Please log in to generate recipes.';
-                break;
-              case 500:
-                errorMessage = 'The recipe service is temporarily unavailable. Please try again later.';
-                break;
-              default:
-                // Use server message if available, otherwise use friendly message
-                errorMessage = axiosError.response.data?.message || 'Error generating recipe. Please try again.';
-            }
-            
-            showToast(errorMessage, 'error', 6000);
-            return;
-          }
-          
-          // Handle network errors
-          if (axiosError.request) {
-            showToast('Unable to connect to the recipe service. Please check your internet connection.', 'error', 6000);
-            return;
-          }
-          
-          // Default axios error message
-          showToast('Error generating recipe. Please try again.', 'error', 6000);
-          return;
-        }
-        
-        // Handle non-axios errors
-        if (err instanceof Error) {
-          showToast(`Error: ${err.message}`, 'error', 6000);
-          return;
-        }
-        
-        // Fallback error message
-        showToast('An unexpected error occurred. Please try again.', 'error', 6000);
+        handleApiError(err);
       } finally {
         setLoading(false);
       }
     },
     [ingredients, showToast]
   );
+
+  // Handle API errors
+  const handleApiError = (err: unknown) => {
+    console.error('Error generating recipe:', err);
+    
+    if (isAxiosError(err)) {
+      const axiosError = err as AxiosError<any>;
+      
+      // Check for friendlyMessage first (highest priority)
+      if ((axiosError as any).friendlyMessage) {
+        showToast((axiosError as any).friendlyMessage, 'error', 6000);
+        return;
+      }
+      
+      // Then check for response.data.friendlyMessage
+      if (axiosError.response?.data?.friendlyMessage) {
+        showToast(axiosError.response.data.friendlyMessage, 'error', 6000);
+        return;
+      }
+      
+      // Handle response errors
+      if (axiosError.response) {
+        let errorMessage = '';
+        
+        switch (axiosError.response.status) {
+          case 400:
+            errorMessage = 'Please check your ingredients and try again. Try specific ingredients like "chicken, rice, tomatoes".';
+            break;
+          case 401:
+            errorMessage = 'Your session has expired. Please log in again to continue.';
+            break;
+          case 403:
+            errorMessage = 'This feature requires authentication. Please log in to generate recipes.';
+            break;
+          case 500:
+            errorMessage = 'The recipe service is temporarily unavailable. Please try again later.';
+            break;
+          default:
+            // Use server message if available, otherwise use friendly message
+            errorMessage = axiosError.response.data?.message || 'Error generating recipe. Please try again.';
+        }
+        
+        showToast(errorMessage, 'error', 6000);
+        return;
+      }
+      
+      // Handle network errors
+      if (axiosError.request) {
+        showToast('Unable to connect to the recipe service. Please check your internet connection.', 'error', 6000);
+        return;
+      }
+      
+      // Default axios error message
+      showToast('Error generating recipe. Please try again.', 'error', 6000);
+      return;
+    }
+    
+    // Handle non-axios errors
+    if (err instanceof Error) {
+      showToast(`Error: ${err.message}`, 'error', 6000);
+      return;
+    }
+    
+    // Fallback error message
+    showToast('An unexpected error occurred. Please try again.', 'error', 6000);
+  };
 
   // -----------------------------
   // Render

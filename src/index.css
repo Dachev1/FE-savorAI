@@ -1,3 +1,5 @@
+/* tailwindcss */
+/* postcss-preset-env stage 0 */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -97,4 +99,32 @@ body {
   opacity: 0;
   transform: translateX(-20px);
   transition: opacity 300ms, transform 300ms;
+}
+
+/* At the top of your index.css file */
+html {
+  visibility: hidden;
+}
+
+.js-loaded {
+  visibility: visible;
+}
+
+/* Add to the top of your existing index.css */
+html.loading {
+  visibility: hidden;
+}
+
+/* Add this CSS to hide that specific button */
+.floating-favorite-button, /* If it has this class */
+#floating-favorite-button, /* Or this ID */
+body > a[href="/favorites"]:first-child, /* Or if it's a direct link */
+body > button:first-child /* Or if it's a direct button */
+{
+  display: none !important;
+}
+
+/* Add this CSS rule to your index.css */
+div.flex.items-center.ml-auto.gap-4 a[href="/favorites"] {
+  display: none !important;
 } 

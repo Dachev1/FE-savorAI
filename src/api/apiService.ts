@@ -1,395 +1,155 @@
-import axios from './axiosConfig';
-import { RecipeResponse as Recipe, IRecipeFormData as RecipeForm } from '../types';
-import { User, RegisterData, LoginData, AuthResponse } from '../types/auth';
+import axios, { CancelTokenSource } from 'axios';
+import auth from '../utils/auth';
 
-// Auth API with optimized memoization
-export const authAPI = {
-  // Memory cache for profile data
-  _profileCache: null as { data: User, timestamp: number } | null,
-  
-  login: async (data: LoginData) => {
-    try {
-      console.log('Making login request to /user/login');
-      
-      // Ensure we have a valid identifier from either data.identifier or data.email
-      const userIdentifier = data.identifier || data.email;
-      console.log(`Attempting login with identifier: ${userIdentifier}`);
-      
-      // Validate the identifier
-      if (!userIdentifier) {
-        throw new Error('Username or email cannot be empty');
-      }
-      
-      // Prepare request data with proper identifier field
-      const loginData = {
-        identifier: userIdentifier,
-        password: data.password
-      };
-      
-      const response = await axios.post('/user/login', loginData, {
-        // Add timeout for login operation
-        timeout: 10000
-      });
-      
-      console.log('Login successful');
-      
-      // Clear profile cache to ensure fresh data after login
-      authAPI._profileCache = null;
-      
-      // Debug the response structure to see what's missing
-      console.log('Login response structure:', {
-        hasData: !!response.data,
-        dataKeys: response.data ? Object.keys(response.data) : [],
-        hasToken: response.data?.token ? true : false,
-        hasUser: response.data?.user ? true : false
-      });
-      
-      // More flexible validation that logs what's missing
-      if (!response.data) {
-        console.error('Invalid login response: missing data');
-        throw new Error('Empty response from server');
-      }
-      
-      // Adapt to the server's actual response structure
-      let token = response.data.token;
-      let user = response.data.user;
-      
-      // If user is embedded differently in the response
-      if (!user && response.data.userData) {
-        user = response.data.userData;
-      } else if (!user && typeof response.data === 'object') {
-        // Try to extract user data from the response object
-        const possibleUser = { ...response.data };
-        if (possibleUser.token) delete possibleUser.token;
-        if (possibleUser.username || possibleUser.email || possibleUser.role) {
-          user = possibleUser;
-        }
-      }
-      
-      // If token is not directly in response.data but elsewhere
-      if (!token && response.headers?.authorization) {
-        token = response.headers.authorization;
-      }
-      
-      // Now check with more detailed errors
-      if (!token) {
-        console.error('Invalid login response: missing token');
-        throw new Error('Authentication token missing from server response');
-      }
-      
-      if (!user) {
-        console.error('Invalid login response: missing user data');
-        throw new Error('User data missing from server response');
-      }
-      
-      return { token, user } as AuthResponse;
-    } catch (error: unknown) {
-      // Don't log the full error object which might contain sensitive data
-      console.error('Login request failed:', error instanceof Error ? error.message : 'Unknown error');
-      throw error;
-    }
-  },
-  
-  register: async (data: RegisterData) => {
-    const response = await axios.post('/user/register', data);
-    return response.data;
-  },
-  
-  logout: async (providedToken?: string) => {
-    try {
-      // Use the provided token if available, otherwise get from localStorage
-      const token = providedToken || localStorage.getItem('authToken');
-      
-      if (!token) {
-        console.log('No token found for logout request');
-        return { success: true, message: 'Logged out locally' };
-      }
-      
-      // Extract bare token if it includes 'Bearer ' prefix
-      const actualToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-      
-      // Log token format (first few characters only for security)
-      console.log(`Logout token format: ${token.substring(0, 10)}...`);
-      
-      // Create a specific config with the authorization header
-      const config = {
-        headers: {
-          'Authorization': actualToken,
-          'Content-Type': 'application/json'
-        }
-      };
-      
-      // Log the actual config being used
-      console.log('Logout request config:', {
-        url: '/user/logout',
-        headers: {
-          Authorization: actualToken.substring(0, 15) + '...',
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      // Make the request with the explicit header config
-      console.log('Sending logout request with token');
-      const response = await axios.post('/user/logout', {}, config);
-      console.log('Logout successful, server response:', response.status);
-      return response.data;
-    } catch (error) {
-      console.log('Logout API error handled gracefully:', error);
-      // Return an empty successful response even if the server returns an error
-      return { success: true, message: 'Logged out locally' };
-    }
-  },
-  
-  getProfile: async () => {
-    try {
-      // Check in-memory cache first (valid for 30 seconds)
-      const now = Date.now();
-      if (authAPI._profileCache && (now - authAPI._profileCache.timestamp < 30000)) {
-        console.log('Using in-memory cached user profile data');
-        return authAPI._profileCache.data;
-      }
-      
-      // Then check localStorage cache
-      const cachedData = localStorage.getItem('cachedUserProfile');
-      if (cachedData && cachedData !== 'undefined') {
-        try {
-          const { data, timestamp } = JSON.parse(cachedData);
-          const isValid = now - timestamp < 30000; // 30 seconds cache
-          
-          if (isValid && data && data.username) {
-            console.log('Using localStorage cached user profile data');
-            // Update in-memory cache
-            authAPI._profileCache = { data, timestamp };
-            return data as User;
-          }
-        } catch (e) {
-          // Handle corrupted localStorage data
-          localStorage.removeItem('cachedUserProfile');
-        }
-      }
-      
-      // Get currently stored user details to optimize request
-      let username = '';
-      try {
-        const userJson = localStorage.getItem('user');
-        if (userJson && userJson !== 'undefined') {
-          const userData = JSON.parse(userJson);
-          if (userData && userData.username) {
-            username = userData.username;
-          }
-        }
-      } catch (e) {
-        // Ignore parsing errors
-      }
-      
-      // Fetch fresh data with timeout protection
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
-      
-      try {
-        // Include username in URL to optimize backend lookup if available
-        // Note: Backend might use either email or username for lookup
-        const params: Record<string, string> = {};
-        
-        if (username) {
-          params.identifier = username; // Use identifier parameter instead of username
-        }
-        
-        const response = await axios.get('/user/current-user', { 
-          signal: controller.signal,
-          params
-        });
-        
-        if (!response.data) {
-          throw new Error('Invalid response: missing user data');
-        }
-        
-        // Cache the response in memory
-        authAPI._profileCache = {
-          data: response.data,
-          timestamp: now
-        };
-        
-        // Cache in localStorage as backup
-        localStorage.setItem('cachedUserProfile', JSON.stringify({
-          data: response.data,
-          timestamp: now
-        }));
-        
-        return response.data as User;
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    } catch (error) {
-      // Handle timeout errors more gracefully
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.error('Profile fetch timeout');
-        throw new Error('Unable to fetch user profile. Request timed out.');
-      }
-      console.error('Error fetching user profile:', error);
-      throw error;
-    }
-  },
+// Track in-flight requests
+const pendingRequests = new Map<string, CancelTokenSource>();
 
-  verifyEmail: async (token: string) => {
-    const response = await axios.get(`/verification/verify/${token}`);
-    return response.data;
-  },
-
-  checkVerificationStatus: async (email: string) => {
-    const response = await axios.get(`/verification/status?email=${encodeURIComponent(email)}`);
-    return response.data;
+// Add global declarations
+declare global {
+  interface Window {
+    dispatchEvent(event: Event): boolean;
   }
+}
+
+// Trigger auth state changed event
+const triggerAuthStateChanged = () => {
+  window.dispatchEvent(new CustomEvent('auth-state-changed', {
+    detail: { timestamp: Date.now() }
+  }));
 };
 
-// Admin API
-export const adminAPI = {
-  getAllUsers: async () => {
-    try {
-      const response = await axios.get('/admin/users');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      throw error;
-    }
-  },
-
-  updateUserRole: async (userId: string, role: string) => {
-    try {
-      const response = await axios.put(`/admin/users/${userId}/role`, { role });
-      return response.data;
-    } catch (error) {
-      console.error(`Error updating role for user ${userId}:`, error);
-      throw error;
-    }
+// Configure API instance
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || '/api',
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
   }
+});
+
+// Add a method to cancel all pending requests
+api.cancelPendingRequests = () => {
+  pendingRequests.forEach((source, key) => {
+    source.cancel('Operation canceled due to logout');
+    pendingRequests.delete(key);
+  });
 };
 
-// Recipe API with optimized caching
-export const recipeAPI = {
-  // Cache for recipes
-  _recipeCache: new Map(),
+// Add custom property to the AxiosRequestConfig
+declare module 'axios' {
+  export interface InternalAxiosRequestConfig {
+    onComplete?: () => void;
+  }
   
-  // Cache duration in milliseconds (2 minutes)
-  _cacheDuration: 120000,
-  
-  _isCacheValid: function(timestamp: number) {
-    return Date.now() - timestamp < this._cacheDuration;
-  },
+  export interface AxiosInstance {
+    cancelPendingRequests?: () => void;
+  }
+}
 
-  getAllRecipes: async (params?: { 
-    tags?: string[],
-    query?: string,
-    page?: number,
-    limit?: number
-  }) => {
-    // Generate cache key based on parameters
-    const cacheKey = `recipes_${JSON.stringify(params || {})}`;
+// Request interceptor
+api.interceptors.request.use(
+  async (config) => {
+    // Identify public endpoints
+    const isPublicEndpoint = 
+      config.url?.includes('/auth/') || 
+      config.url?.includes('/public/') ||
+      (config.url?.includes('/users') && config.method === 'post');
     
-    // Check if cache exists and is valid
-    const cachedItem = recipeAPI._recipeCache.get(cacheKey);
-    if (cachedItem && recipeAPI._isCacheValid(cachedItem.timestamp)) {
-      console.log('Using cached recipes data');
-      return cachedItem.data;
+    // Special case for logout requests to ensure they always have auth headers
+    const isLogoutRequest = config.url?.includes('/auth/logout');
+    
+    // Handle duplicate requests
+    const pendingKey = `${config.method}-${config.url}-${JSON.stringify(config.params || {})}`;
+    if (pendingRequests.has(pendingKey)) {
+      const source = pendingRequests.get(pendingKey)!;
+      source.cancel('Duplicate request cancelled');
+      pendingRequests.delete(pendingKey);
     }
     
-    // Fetch fresh data
-    const response = await axios.get('/recipe', { params });
+    // Create cancel token
+    const source = axios.CancelToken.source();
+    config.cancelToken = config.cancelToken || source.token;
+    pendingRequests.set(pendingKey, source);
+    config.onComplete = () => pendingRequests.delete(pendingKey);
     
-    // Update cache
-    recipeAPI._recipeCache.set(cacheKey, {
-      data: response.data,
-      timestamp: Date.now()
-    });
-    
-    return response.data;
-  },
-  
-  getRecipeById: async (id: string) => {
-    // Check cache first
-    const cacheKey = `recipe_${id}`;
-    const cachedItem = recipeAPI._recipeCache.get(cacheKey);
-    
-    if (cachedItem && recipeAPI._isCacheValid(cachedItem.timestamp)) {
-      console.log(`Using cached data for recipe ${id}`);
-      return cachedItem.data as Recipe;
-    }
-    
-    const response = await axios.get(`/recipe/${id}`);
-    
-    // Update cache
-    recipeAPI._recipeCache.set(cacheKey, {
-      data: response.data,
-      timestamp: Date.now()
-    });
-    
-    return response.data as Recipe;
-  },
-  
-  createRecipe: async (data: RecipeForm) => {
-    const response = await axios.post('/recipe', data);
-    // Invalidate recipes list cache
-    recipeAPI._recipeCache.delete('recipes_{}');
-    return response.data;
-  },
-  
-  updateRecipe: async (id: string, data: RecipeForm) => {
-    const response = await axios.put(`/recipe/${id}`, data);
-    // Invalidate related caches
-    recipeAPI._recipeCache.delete(`recipe_${id}`);
-    recipeAPI._recipeCache.delete('recipes_{}');
-    return response.data;
-  },
-  
-  deleteRecipe: async (id: string) => {
-    const response = await axios.delete(`/recipe/${id}`);
-    // Invalidate related caches
-    recipeAPI._recipeCache.delete(`recipe_${id}`);
-    recipeAPI._recipeCache.delete('recipes_{}');
-    return response.data;
-  },
-  
-  generateRecipe: async (preferences: any) => {
-    const response = await axios.post('/recipe/generate', preferences);
-    return response.data;
-  },
-  
-  clearCache: () => {
-    recipeAPI._recipeCache.clear();
-    console.log('Recipe cache cleared');
-  },
-
-  // Debounce function for search operations
-  _debounce: (fn: Function, delay: number) => {
-    let timer: number | null = null;
-    return (...args: any[]) => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        fn(...args);
-        timer = null;
-      }, delay) as unknown as number;
-    };
-  },
-
-  // Preload common recipes to improve UX
-  preloadCommonRecipes: async () => {
-    // Only preload if no cache exists
-    if (!recipeAPI._recipeCache.has('recipes_{}')) {
-      console.log('Preloading common recipes for faster UX');
-      try {
-        // Use low priority fetch to avoid competing with more important requests
-        setTimeout(async () => {
-          await recipeAPI.getAllRecipes();
-        }, 2000);
-      } catch (e) {
-        // Silently fail - this is just a preload
+    // Add auth token for protected endpoints or logout requests
+    if (!isPublicEndpoint || isLogoutRequest) {
+      if (!auth.isTokenValid() && !isLogoutRequest) {
+        source.cancel('No valid authentication');
+        return Promise.reject({ cancelled: true });
+      }
+      
+      const token = auth.getToken();
+      if (token) {
+        // Always add Bearer prefix to the Authorization header
+        config.headers.Authorization = `Bearer ${token}`;
       }
     }
-  }
-};
+    
+    return config;
+  },
+  error => Promise.reject(error)
+);
 
-export default {
-  auth: authAPI,
-  admin: adminAPI,
-  recipes: recipeAPI
-}; 
+// Response interceptor
+api.interceptors.response.use(
+  (response) => {
+    if (response.config.onComplete) response.config.onComplete();
+    
+    // Handle auth tokens
+    const isAuthEndpoint = response.config.url?.includes('/auth/');
+    
+    // Save token from response
+    if (isAuthEndpoint && response.data?.token) {
+      // Store raw token without Bearer prefix
+      const token = response.data.token;
+      const rawToken = token.startsWith('Bearer ') ? token.substring(7) : token;
+      auth.setToken(rawToken);
+    } else {
+      const authHeader = 
+        response.headers['x-auth-token'] || 
+        response.headers['authorization'] ||
+        response.headers['Authorization'];
+        
+      if (authHeader) {
+        // Store raw token without Bearer prefix
+        const rawToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
+        auth.setToken(rawToken);
+      }
+    }
+    
+    return response;
+  },
+  (error) => {
+    if (error.config?.onComplete) error.config.onComplete();
+    
+    // Handle cancelled requests
+    if (axios.isCancel(error) || error.cancelled) {
+      return Promise.reject({
+        isCancel: true,
+        isCancelled: true,
+        message: error.message || 'Request cancelled'
+      });
+    }
+    
+    // Handle network errors
+    if (!error.response) {
+      window.dispatchEvent(new CustomEvent('api-network-error', {
+        detail: { message: error.message }
+      }));
+    }
+    
+    // Handle auth errors
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      if (error.response.status === 403 && !error.config.url?.includes('/profile')) {
+        auth.removeToken();
+        triggerAuthStateChanged();
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
+export default api; 

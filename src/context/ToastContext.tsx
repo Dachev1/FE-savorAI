@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { ToastContainer, ToastType } from '../components/common/Toast';
 
 interface Toast {
@@ -8,103 +9,149 @@ interface Toast {
   duration?: number;
 }
 
-interface ToastContextValue {
+interface ToastContextType {
+  toasts: Toast[];
   showToast: (message: string, type: ToastType, duration?: number) => void;
   hideToast: (id: string) => void;
 }
 
-const ToastContext = createContext<ToastContextValue | undefined>(undefined);
+const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
-/**
- * ToastProvider Component
- * 
- * Provides a context for managing toast notifications across the application.
- * Includes methods for showing and hiding toast messages.
- */
+export const useToast = () => {
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error('useToast must be used within a ToastProvider');
+  }
+  return context;
+};
+
 interface ToastProviderProps {
   children: ReactNode;
 }
 
-// Default durations for different toast types
-const DEFAULT_DURATION = 5000;
-const ERROR_DURATION = 8000;
-
 export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
+  // Array of active toasts
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [isReady, setIsReady] = useState(false);
   
-  // Check if document is available (for SSR safety)
-  useEffect(() => {
-    setIsReady(true);
-  }, []);
+  // Use a ref to track toast timestamps to prevent duplicates during rapid refreshes
+  const toastTimestamps = useRef<Record<string, number>>({});
+  // Minimum time between identical toasts in milliseconds
+  const TOAST_THROTTLE_TIME = 2000;
   
-  // Add a new toast
-  const showToast = useCallback((message: string, type: ToastType, duration?: number) => {
-    if (!message) {
-      console.warn('Attempted to show toast with empty message');
-      return '';
+  // Show toast with duplicate prevention
+  const showToast = useCallback((
+    message: string, 
+    type: ToastType = 'info', 
+    duration = 5000,
+  ) => {
+    // Skip empty messages
+    if (!message?.trim()) return;
+    
+    // Create a unique key for this toast
+    const toastKey = `${type}:${message}`;
+    
+    // Check if this exact message is already showing
+    if (toasts.some(toast => `${toast.type}:${toast.message}` === toastKey)) {
+      return;
     }
     
-    // Generate a unique ID that includes timestamp to avoid collisions
-    const timestamp = new Date().getTime();
-    const randomStr = Math.random().toString(36).substring(2, 5);
-    const id = `toast-${timestamp}-${randomStr}`;
+    // Check timestamp cache to prevent rapid duplicate toasts
+    const now = Date.now();
+    const lastShown = toastTimestamps.current[toastKey] || 0;
     
-    console.log(`Creating toast: ${id}, message: ${message}, type: ${type}`);
+    // If we've shown this toast recently, skip it
+    if (now - lastShown < TOAST_THROTTLE_TIME) {
+      return;
+    }
     
-    // Set appropriate duration based on type if not explicitly provided
-    const finalDuration = duration || (type === 'error' ? ERROR_DURATION : DEFAULT_DURATION);
+    // Update the timestamp for this toast
+    toastTimestamps.current[toastKey] = now;
     
-    // Add new toast to the list - use function form to ensure we're working with latest state
-    setToasts(prevToasts => {
-      const newToasts = [{ id, message, type, duration: finalDuration }, ...prevToasts];
-      console.log(`Toast state updated. Current toasts: ${newToasts.length}`);
-      return newToasts;
-    });
+    // Create a new toast
+    const newToast: Toast = {
+      id: uuidv4(),
+      message,
+      type,
+      duration
+    };
     
-    // Auto-remove toast after duration + animation time
-    setTimeout(() => {
-      console.log(`Auto-removing toast: ${id}`);
-      hideToast(id);
-    }, finalDuration + 500);
-    
-    return id;
+    // Add toast to the array
+    setToasts(prev => [newToast, ...prev]);
+  }, [toasts]);
+  
+  // Remove toast by ID
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
   }, []);
   
-  // Remove a toast by ID
-  const hideToast = useCallback((id: string) => {
-    console.log(`Hiding toast: ${id}`);
-    setToasts(prevToasts => {
-      const remaining = prevToasts.filter(toast => toast.id !== id);
-      console.log(`After hiding, ${remaining.length} toasts remain`);
-      return remaining;
-    });
+  // Clean up old timestamps periodically to prevent memory leaks
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const now = Date.now();
+      const updatedTimestamps = { ...toastTimestamps.current };
+      
+      // Remove timestamps older than 1 minute
+      Object.keys(updatedTimestamps).forEach(key => {
+        if (now - updatedTimestamps[key] > 60000) {
+          delete updatedTimestamps[key];
+        }
+      });
+      
+      toastTimestamps.current = updatedTimestamps;
+    }, 60000); // Clean up every minute
+    
+    return () => clearInterval(intervalId);
   }, []);
   
-  const value = { showToast, hideToast };
+  // Listen for network errors
+  useEffect(() => {
+    const handleNetworkError = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      showToast(`Network error: ${detail.message || 'Connection failed'}`, 'error');
+    };
+    
+    // Listen for server errors
+    const handleServerError = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      showToast(`Server error (${detail.status}). Please try again later.`, 'error');
+    };
+    
+    // Attach event listeners
+    window.addEventListener('network-error', handleNetworkError);
+    window.addEventListener('server-error', handleServerError);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('network-error', handleNetworkError);
+      window.removeEventListener('server-error', handleServerError);
+    };
+  }, []);
+  
+  // Listen for toast message events
+  useEffect(() => {
+    const handleToastMessage = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (detail && detail.message) {
+        showToast(detail.message, detail.type || 'info', detail.duration);
+      }
+    };
+    
+    window.addEventListener('toast-message', handleToastMessage);
+    
+    return () => {
+      window.removeEventListener('toast-message', handleToastMessage);
+    };
+  }, [showToast]);
   
   return (
-    <ToastContext.Provider value={value}>
+    <ToastContext.Provider value={{ toasts, showToast, hideToast: removeToast }}>
       {children}
-      {isReady && <ToastContainer toasts={toasts} onRemoveToast={hideToast} />}
+      <ToastContainer 
+        toasts={toasts}
+        onRemoveToast={removeToast}
+      />
     </ToastContext.Provider>
   );
 };
 
-/**
- * useToast Hook
- * 
- * Custom hook to access the toast context for showing notifications.
- * Usage: const { showToast } = useToast();
- */
-export const useToast = (): ToastContextValue => {
-  const context = useContext(ToastContext);
-  
-  if (context === undefined) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
-  
-  return context;
-};
-
-export default ToastProvider; 
+export default ToastContext; 

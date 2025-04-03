@@ -18,7 +18,38 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       once: true,
       mirror: false,
     });
+    
+    // Handle route changes to prevent unmounting issues
+    const handleRouteChange = () => {
+      // Ensure any AOS animations are completed
+      AOS.refresh();
+    };
+    
+    // Listen for route changes
+    window.addEventListener('popstate', handleRouteChange);
+    
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+      // Clean up any animations
+      AOS.refresh();
+    };
   }, []);
+
+  // Apply theme to document body
+  useEffect(() => {
+    // Remove any existing theme classes
+    document.body.classList.remove('light-theme', 'dark-theme');
+    
+    // Add current theme class
+    document.body.classList.add(isDarkMode ? 'dark-theme' : 'light-theme');
+    
+    // Add dark class to html for Tailwind
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   return (
     <div className={`min-h-screen flex flex-col w-full overflow-x-hidden ${isDarkMode ? 'dark bg-gray-900 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
@@ -40,7 +71,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <Navbar />
       </header>
       
-      <main className="flex-grow w-full overflow-x-hidden">
+      <main className="flex-grow w-full overflow-x-hidden transition-colors duration-300">
         {children}
       </main>
 

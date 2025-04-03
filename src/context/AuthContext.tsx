@@ -1,389 +1,861 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-import { User, LoginData, RegisterData } from '../types/auth';
-import { authAPI } from '../api/apiService';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from './ToastContext';
-import { cancelAllRequests } from '../api/axiosConfig';
+import { ToastType } from '../components/common/Toast';
+import api from '../api/apiService';
+import auth from '../utils/auth';
+import { ROUTES } from '../routes';
 
-// Define auth state types for better type checking
-interface AuthState {
-  user: User | null;
-  isLoading: boolean;
-  lastAuthCheck: number;
-  authInitialized: boolean; // Add flag to track initialization
+// Types
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  role?: string;
+  firstName?: string;
+  lastName?: string;
+  bio?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  banned?: boolean;
 }
 
-// Define protected routes for easy navigation checks
-const AUTH_ROUTES = ['/signin', '/signup', '/login', '/register'];
-const HOME_ROUTE = '/';
+interface SignupData {
+  username: string;
+  email: string;
+  password: string;
+  confirmPassword?: string;
+}
 
-interface AuthContextType {
-  user: User | null;
+interface SignInResult {
+  success: boolean;
+  error?: string;
+  fieldErrors?: Record<string, string>;
+  isBanned?: boolean;
+}
+
+interface AuthResponse {
+  token?: string;
+  access_token?: string;
+  authToken?: string;
+  jwt?: string;
+  user?: User;
+  userData?: User;
+  userDetails?: User;
+  success?: boolean;
+  message?: string;
+  [key: string]: any;
+}
+
+interface ProfileResponse extends User {
+  success?: boolean;
+}
+
+interface AuthContextInterface {
   isAuthenticated: boolean;
-  isAdmin: boolean;
+  user: User | null;
   isLoading: boolean;
-  login: (data: LoginData) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
-  logout: () => void;
+  isAdmin: boolean;
+  signin: (
+    identifier: string, 
+    password: string, 
+    remember?: boolean, 
+    redirectPath?: string
+  ) => Promise<SignInResult>;
+  signup: (formData: SignupData) => Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+    isDuplicate?: boolean;
+    duplicateEmail?: string;
+  }>;
+  logout: () => Promise<void>;
+  refreshUserData: () => Promise<boolean>;
   checkAuth: () => Promise<boolean>;
+  updateUsername: (currentPassword: string, newUsername: string) => Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Create the context with default values
+const AuthContext = createContext<AuthContextInterface>({
+  isAuthenticated: false,
+  user: null,
+  isLoading: true,
+  isAdmin: false,
+  signin: async () => ({ success: false, error: 'AuthContext not initialized' }),
+  signup: async () => ({ success: false, error: 'AuthContext not initialized' }),
+  logout: async () => {},
+  refreshUserData: async () => false,
+  updateUsername: async () => ({ success: false, error: 'AuthContext not initialized' }),
+  checkAuth: async () => false,
+});
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = React.memo(({ children }) => {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    isLoading: true,
-    lastAuthCheck: 0,
-    authInitialized: false // Initialize as false
-  });
-  
-  const { showToast } = useToast();
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Only log if not suppressed
+  if (!window.localStorage.getItem('suppress_logs')) {
+    // Comment the line below to disable logs
+    // console.log('AuthProvider rendering');
+  }
   const navigate = useNavigate();
-  const location = useLocation();
+  const toastContext = useToast();
+  
+  // Toast utility
+  const showToast = useCallback((message: string, type: ToastType = 'info', duration?: number) => {
+    if (toastContext) {
+      toastContext.showToast(message, type, duration);
+    } else {
+      console.warn('Toast context is not available, message:', message);
+    }
+  }, [toastContext]);
+  
+  // State
+  const [user, setUser] = useState<User | null>(() => auth.getUser<User>());
+  
+  // Function references to avoid circular dependencies
+  const logoutRef = useRef<() => Promise<void>>();
+  
+  // Request tracking
+  const refreshInProgressRef = useRef<boolean>(false);
+  const lastRefreshTimeRef = useRef<number>(0);
+  const REFRESH_COOLDOWN = 3000; // 3 seconds between refreshes
+  
+  // Polling reference for background checks
+  const banCheckIntervalRef = useRef<number | null>(null);
+  
+  // Computed properties
+  const isAuthenticated = useMemo(() => !!user && !!user.id, [user]);
+  const isAdmin = useMemo(() => {
+    if (!isAuthenticated || !user) return false;
+    const authRole = auth.getRole();
+    const userRole = user.role?.toLowerCase() || '';
+    const isAdminRole = 
+      (authRole && ['admin', 'administrator'].includes(authRole.toLowerCase())) || 
+      ['admin', 'administrator'].includes(userRole);
+    return !!isAdminRole;
+  }, [isAuthenticated, user]);
+  
+  // Update user state
+  const updateUserState = useCallback((userData: User | null) => {
+    if (userData) {
+      auth.setUser(userData);
+    } else {
+      localStorage.removeItem('user_data');
+    }
+    setUser(userData);
+  }, []);
 
-  // Use destructured state for cleaner code
-  const { user, isLoading, lastAuthCheck, authInitialized } = authState;
+  // Enhanced handle user banning with cache clearing
+  const handleUserBanned = useCallback(() => {
+    console.warn('User has been banned, clearing auth state');
+    
+    // Clear all caches
+    sessionStorage.clear();
+    
+    // Clear auth state
+    auth.clearAuth();
+    
+    // Clear any localStorage cache related to user
+    Object.keys(localStorage).forEach(key => {
+      if (key.includes('user') || key.includes('admin') || key.includes('auth')) {
+        localStorage.removeItem(key);
+      }
+    });
+    
+    // Update UI
+    updateUserState(null);
+    
+    // Show toast notification
+    showToast('Your account has been banned.', 'error', 5000);
+    
+    // Navigate to sign-in
+    navigate(ROUTES.SIGN_IN);
+  }, [showToast, updateUserState, navigate]);
 
-  // Memoize the checkAuth function with useCallback to prevent unnecessary re-renders
-  const checkAuth = useCallback(async (): Promise<boolean> => {
+  // Background polling for ban status
+  useEffect(() => {
+    // Only check if authenticated
+    if (!isAuthenticated || !user?.id) return;
+    
+    // Start polling for ban status if user is authenticated
+    const checkBanStatus = async () => {
+      try {
+        // Check if token already indicates banned
+        if (auth.isUserBanned()) {
+          handleUserBanned();
+          return;
+        }
+        
+        // Check with server - add timestamp to prevent duplicate request errors
+        const timestamp = Date.now();
+        const response = await api.get<{ banned: boolean }>(
+          `/api/v1/auth/check-status?identifier=${encodeURIComponent(user.username || user.email)}&_t=${timestamp}`
+        );
+        
+        if (response.data?.banned) {
+          handleUserBanned();
+        }
+      } catch (error: any) {
+        // Ignore cancellation errors to prevent console spam
+        if (error?.isCancel || error?.isCancelled || error?.code === 'ERR_CANCELED') {
+          return; // Silently ignore canceled requests
+        }
+        console.error('Error checking ban status:', error);
+      }
+    };
+    
+    // Initial check
+    checkBanStatus();
+    
+    // Setup polling every 5 minutes (300000ms)
+    const intervalId = window.setInterval(checkBanStatus, 300000);
+    banCheckIntervalRef.current = intervalId as unknown as number;
+    
+    return () => {
+      if (banCheckIntervalRef.current) {
+        window.clearInterval(banCheckIntervalRef.current);
+        banCheckIntervalRef.current = null;
+      }
+    };
+  }, [isAuthenticated, user, handleUserBanned]);
+
+  // Route change handler for auth check
+  useEffect(() => {
+    const handleRouteChange = () => {
+      // Check ban status on route change for authenticated users
+      if (isAuthenticated && user) {
+        const checkBanStatus = async () => {
+          // First check local cache/token
+          if (auth.isUserBanned()) {
+            handleUserBanned();
+            return;
+          }
+          
+          // We don't need to make an API call on every route change 
+          // as the polling will handle periodic checks
+        };
+        
+        checkBanStatus();
+      }
+    };
+    
+    // Listen for route changes
+    window.addEventListener('popstate', handleRouteChange);
+    
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+    };
+  }, [isAuthenticated, user, handleUserBanned]);
+
+  // Refresh user data
+  const refreshUserData = useCallback(async (): Promise<boolean> => {
     try {
+      if (!auth.isTokenValid()) {
+        return false;
+      }
+      
+      // Throttle requests
       const now = Date.now();
-      // Skip frequent checks if user is already authenticated or checked recently
-      if ((now - lastAuthCheck < 2000) && (user !== null || lastAuthCheck > 0)) {
-        if (import.meta.env.DEV) {
-          console.log('Skipping auth check - recently checked');
-        }
-        return !!user;
-      }
-      
-      // Update last check timestamp
-      setAuthState(prev => ({ ...prev, lastAuthCheck: now }));
-      
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        if (import.meta.env.DEV) {
-          console.log('No auth token found in localStorage, user not authenticated');
-        }
-        return false;
-      }
-      
-      // Get current user data from localStorage if available
-      let username = '';
-      try {
-        const userJson = localStorage.getItem('user');
-        if (userJson && userJson !== 'undefined') {
-          const userData = JSON.parse(userJson);
-          if (userData && userData.username) {
-            username = userData.username;
-          }
-        }
-      } catch (e) {
-        // Ignore parsing errors
-      }
-      
-      if (import.meta.env.DEV) {
-        console.log('Auth token found, fetching user profile' + (username ? ` for ${username}` : ''));
-      }
-      
-      try {
-        const userData = await authAPI.getProfile();
-        
-        if (import.meta.env.DEV) {
-          console.log('User profile fetched successfully:', { username: userData.username, role: userData.role });
-        }
-        
-        // Store user data for request interceptor - use safe stringify
-        if (userData) {
-          localStorage.setItem('user', JSON.stringify(userData));
-        }
-        
-        // Update state with user data
-        setAuthState(prev => ({ ...prev, user: userData }));
-        
-        // Check if we are on an auth page and redirect if needed
-        const currentPath = location.pathname;
-        if (AUTH_ROUTES.includes(currentPath)) {
-          if (import.meta.env.DEV) {
-            console.log('User is authenticated but on auth page, redirecting...');
-          }
-          navigate(HOME_ROUTE, { replace: true });
-        }
-        
+      if (now - lastRefreshTimeRef.current < REFRESH_COOLDOWN) {
         return true;
-      } catch (profileError) {
-        console.error('Failed to get user profile:', profileError);
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        localStorage.removeItem('cachedUserProfile');
-        setAuthState(prev => ({ ...prev, user: null }));
+      }
+      if (refreshInProgressRef.current) {
+        return true;
+      }
+      
+      refreshInProgressRef.current = true;
+      lastRefreshTimeRef.current = now;
+      
+      try {
+        const response = await api.get<ProfileResponse>('/api/v1/user/profile');
+        const profileData = response.data;
+        
+        if (profileData?.id) {
+          // Store previous role to detect changes
+          const previousRole = user?.role;
+          
+          // Always update with latest server data
+          updateUserState(profileData);
+          
+          // Detect and handle role changes
+          if (previousRole && profileData.role && previousRole !== profileData.role) {
+            console.log(`User role changed from ${previousRole} to ${profileData.role}`);
+            showToast(`Your account role has been updated to ${profileData.role}`, 'info', 5000);
+            
+            // Notify about role change
+            auth.notifyRoleChange(previousRole, profileData.role);
+          }
+          
+          // Check if user is now banned
+          if (profileData.banned === true && user?.banned !== true) {
+            handleUserBanned();
+            return false;
+          }
+          
+          return true;
+        }
+        
         return false;
+      } finally {
+        setTimeout(() => {
+          refreshInProgressRef.current = false;
+        }, 100);
       }
     } catch (error) {
-      console.error('Authentication check failed:', error);
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      localStorage.removeItem('cachedUserProfile');
       return false;
-    } 
-  }, [lastAuthCheck, user, navigate, location.pathname]);
+    }
+  }, [updateUserState, user, showToast, handleUserBanned]);
+  
+  // Enhanced fetchLatestUserData function with token refresh
+  const fetchLatestUserData = useCallback(async (): Promise<User | null> => {
+    try {
+      // Force token refresh before fetching profile
+      auth.forceTokenRefresh();
+      
+      const token = auth.getToken();
+      if (!token) return null;
+      
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        // Prevent caching
+        params: {
+          '_': Date.now() // Add timestamp to prevent caching
+        }
+      };
+      
+      const response = await api.get<User>('/api/v1/user/profile', config);
+      return response.data || null;
+    } catch (error) {
+      console.error('Error fetching latest user data:', error);
+      return null;
+    }
+  }, []);
 
-  // Effect to initialize authentication - improved with better cleanup
+  // Enhanced checkAuth function to force server verification
+  const checkAuth = useCallback(async (): Promise<boolean> => {
+    // Skip if already in progress or if we've refreshed recently
+    if (refreshInProgressRef.current) {
+      return isAuthenticated;
+    }
+    
+    // Check if the token is still valid
+    if (!auth.isTokenValid()) {
+      updateUserState(null);
+      return false;
+    }
+    
+    // Check for cooldown to avoid excessive API calls
+    const now = Date.now();
+    if (now - lastRefreshTimeRef.current < REFRESH_COOLDOWN) {
+      return isAuthenticated;
+    }
+    
+    // Set refresh in progress flag
+    refreshInProgressRef.current = true;
+    
+    try {
+      const response = await api.get<ProfileResponse>('/api/v1/auth/profile');
+      const userData = response.data;
+      
+      // Check if banned 
+      if (userData.banned === true) {
+        handleUserBanned();
+        refreshInProgressRef.current = false;
+        return false;
+      }
+      
+      // Only update if we got valid data
+      if (userData && userData.id) {
+        // Update state with latest user data
+        updateUserState(userData);
+        lastRefreshTimeRef.current = now;
+        
+        // Dispatch auth-restored event if user was already authenticated
+        if (isAuthenticated) {
+          window.dispatchEvent(new CustomEvent('auth-state-changed', { 
+            detail: { 
+              action: 'auth-restored',
+              timestamp: Date.now(),
+              user: userData
+            }
+          }));
+        }
+        
+        refreshInProgressRef.current = false;
+        return true;
+      }
+      
+      // If we didn't get valid data, clear auth
+      updateUserState(null);
+      refreshInProgressRef.current = false;
+      return false;
+    } catch (error) {
+      console.error('Error refreshing auth:', error);
+      refreshInProgressRef.current = false;
+      return isAuthenticated; // Return current state on error
+    }
+  }, [isAuthenticated, updateUserState, handleUserBanned]);
+
+  // Enhanced useEffect to ensure auth state is frequently checked
   useEffect(() => {
-    // Skip if already initialized
-    if (authInitialized) return;
-    
-    let isMounted = true;
-    const abortController = new AbortController();
-    
-    const initAuth = async () => {
-      if (!isMounted) return;
-      
-      // Only set loading if we're not already loading
-      if (!isLoading) {
-        setAuthState(prev => ({ ...prev, isLoading: true }));
+    // Set up auth check interval to detect banned/role changes
+    // Check every 30 seconds when user is logged in
+    const authCheckInterval = setInterval(async () => {
+      if (user?.id && auth.isTokenValid()) {
+        await checkAuth();
       }
-      
-      try {
-        // Only log in development mode
-        if (import.meta.env.DEV) {
-          console.log('Initializing authentication check...');
-        }
-        
-        const isAuthed = await checkAuth();
-        
-        if (isMounted) {
-          // Only log in development mode
-          if (import.meta.env.DEV) {
-            console.log('Authentication check result:', isAuthed);
-          }
-          
-          // Mark as initialized
-          setAuthState(prev => ({ ...prev, authInitialized: true }));
-        }
-      } finally {
-        if (isMounted) {
-          setAuthState(prev => ({ ...prev, isLoading: false }));
-          
-          // Only log in development mode
-          if (import.meta.env.DEV) {
-            console.log('Authentication initialization complete');
-          }
-        }
-      }
-    };
-
-    // Execute init auth
-    initAuth();
+    }, 30000); // 30 seconds
     
-    // Cleanup function to prevent memory leaks and cancel pending requests
+    // Initial auth check
+    if (!user?.id && auth.isTokenValid()) {
+      checkAuth();
+    }
+    
     return () => {
-      isMounted = false;
-      abortController.abort();
-      cancelAllRequests();
+      clearInterval(authCheckInterval);
     };
-  }, [checkAuth, authInitialized, isLoading]);
+  }, [user, checkAuth]);
 
-  // Check auth on path change for protected routes
+  // Add useEffect to enforce immediate auth check on route changes
   useEffect(() => {
-    const currentPath = location.pathname;
-    
-    // Only check if we've moved to a different route that needs auth verification
-    // This prevents unnecessary auth checks when navigating to non-auth routes
-    if (authInitialized && !isLoading && !AUTH_ROUTES.includes(currentPath)) {
-      // Add debounce to prevent too frequent checks
-      const timer = setTimeout(() => {
-        if (import.meta.env.DEV) {
-          console.log(`Path changed to ${currentPath}, checking auth status`);
-        }
+    // Listen for navigation events
+    const handleRouteChange = () => {
+      // Force check auth on every route change if the user is logged in
+      if (user?.id && auth.isTokenValid()) {
         checkAuth();
-      }, 300);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [location.pathname, checkAuth, isLoading, authInitialized]);
+      }
+    };
+    
+    // Add event listener for navigation
+    window.addEventListener('popstate', handleRouteChange);
+    
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+    };
+  }, [user, checkAuth]);
 
-  // Login function with improved error handling
-  const login = async (data: LoginData): Promise<void> => {
-    setAuthState(prev => ({ ...prev, isLoading: true }));
+  // Handle logout
+  const logout = useCallback(async (): Promise<void> => {
     try {
-      // Only log the identifier, not the full data object that contains password
-      const userIdentifier = data.identifier || data.email;
-      console.log('Attempting login for user:', userIdentifier);
+      // Cancel any pending requests to avoid React errors
+      api.cancelPendingRequests?.();
       
-      const response = await authAPI.login(data);
-      console.log('Login successful, got response:', {
-        hasToken: !!response.token,
-        hasUser: !!response.user,
-        userKeys: response.user ? Object.keys(response.user) : []
-      });
+      // First dispatch event to notify components to prepare for unmounting
+      window.dispatchEvent(new CustomEvent('prepare-for-logout', { 
+        detail: { timestamp: Date.now() }
+      }));
       
-      const { token, user } = response;
+      // Add a visible indicator that logout is in progress
+      const loaderEl = document.createElement('div');
+      loaderEl.style.position = 'fixed';
+      loaderEl.style.top = '0';
+      loaderEl.style.left = '0';
+      loaderEl.style.width = '100%';
+      loaderEl.style.height = '3px';
+      loaderEl.style.backgroundColor = '#3b82f6';
+      loaderEl.style.zIndex = '9999';
+      loaderEl.style.transition = 'width 0.5s ease-out';
+      document.body.appendChild(loaderEl);
       
-      if (!user) {
-        throw new Error('Invalid response: user data missing');
+      // Prevent any navigation during logout
+      window.history.pushState(null, '', window.location.pathname);
+      
+      // Prevent default behavior for all links during logout
+      const preventClicks = (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      };
+      
+      document.addEventListener('click', preventClicks, true);
+      
+      // Small delay to allow components to prepare for unmounting
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Animate loader
+      loaderEl.style.width = '70%';
+      
+      const token = auth.getToken();
+      
+      // Try server-side logout if we have a token
+      if (token) {
+        try {
+          await api.post('/api/v1/auth/logout', {}, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          console.log('Server-side logout successful');
+        } catch (error) {
+          console.warn('Server-side logout failed, continuing with client-side logout');
+        }
       }
       
-      // Store authentication data with proper Bearer prefix
-      const tokenToStore = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-      localStorage.setItem('authToken', tokenToStore);
+      // Complete loader animation
+      loaderEl.style.width = '100%';
       
-      // Ensure we're storing a valid JSON string
-      localStorage.setItem('user', JSON.stringify(user));
+      // Clear client-side state
+      auth.clearAuth();
       
-      // Set user state
-      setAuthState(prev => ({ ...prev, user }));
+      // First update UI state in a safe manner
+      updateUserState(null);
       
-      // Show success message with user's name if available
-      const welcomeMessage = user.name ? 
-        `Welcome back, ${user.name}!` : 
-        'Welcome back!';
-      showToast(welcomeMessage, 'success');
+      // UI feedback
+      showToast('Logged out successfully', 'success');
       
-      // Get the intended destination from localStorage or default to home
-      const intendedPath = localStorage.getItem('intendedPath') || HOME_ROUTE;
-      localStorage.removeItem('intendedPath'); // Clear it after use
+      // Dispatch event to notify app components of logout
+      window.dispatchEvent(new CustomEvent('auth-state-changed', { 
+        detail: { 
+          action: 'logout',
+          timestamp: Date.now()
+        }
+      }));
       
-      // Add small delay to ensure localStorage is updated before navigation
+      // Clear any references to removed components
+      // This helps React's garbage collection
+      window.dispatchEvent(new CustomEvent('cleanup-components', {
+        detail: { timestamp: Date.now() }
+      }));
+      
+      // A more substantial delay for navigation to ensure cleanup is complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Remove the loader
+      try {
+        document.body.removeChild(loaderEl);
+      } catch (e) {
+        // Ignore errors
+      }
+      
+      // Remove click prevention
+      document.removeEventListener('click', preventClicks, true);
+      
+      // Reset all flags
+      sessionStorage.removeItem('logout_in_progress');
+      
+      // Finally navigate
+      navigate(ROUTES.SIGN_IN);
+    } catch (error) {
+      // Emergency cleanup in case of error
+      console.error('Logout error:', error);
+      auth.clearAuth();
+      setUser(null);
+      sessionStorage.removeItem('logout_in_progress');
+      
+      // Force navigation
+      window.location.href = ROUTES.SIGN_IN;
+    }
+  }, [navigate, showToast, updateUserState]);
+  
+  // Store logout reference to avoid circular dependencies
+  useEffect(() => {
+    logoutRef.current = logout;
+  }, [logout]);
+
+  // Wrap signin to enforce token refresh
+  const signin = useCallback(async (
+    identifier: string, 
+    password: string, 
+    remember?: boolean, 
+    redirectPath?: string
+  ): Promise<SignInResult> => {
+    try {
+      // Reset auth state for clean login
+      auth.resetForLogin();
+      
+      const response = await api.post<AuthResponse>('/api/v1/auth/signin', { identifier, password });
+      const data = response.data;
+      
+      if (!data) return { success: false, error: 'Invalid response from server' };
+      
+      // Process user data
+      const userData = data.user || data.userData || data.userDetails || data;
+      if (!userData?.id) {
+        auth.removeToken();
+        return { success: false, error: 'Invalid credentials' };
+      }
+      
+      // Enhanced check for banned users with clear messaging
+      if (userData.banned === true) {
+        // Set the banned flag in session storage
+        sessionStorage.setItem('account_banned', 'true');
+        
+        // Clear any existing auth tokens
+        auth.removeToken();
+        
+        // Show prominent error toast
+        showToast('Your account has been banned. Please contact support for assistance.', 'error', 10000);
+        
+        // Return detailed error
+        return {
+          success: false,
+          error: 'Your account has been banned by an administrator. Please contact support for assistance.',
+          isBanned: true
+        };
+      }
+      
+      // Only proceed with token storage and welcome message if not banned
+      const token = data.token || data.access_token || data.authToken || data.jwt;
+      if (!token) return { success: false, error: 'Invalid credentials' };
+      
+      // Remove any previous banned flag
+      sessionStorage.removeItem('account_banned');
+      
+      // Store token and update state
+      auth.setToken(token);
+      updateUserState(userData as User);
+      lastRefreshTimeRef.current = Date.now();
+      
+      console.log('User authenticated successfully, dispatching auth event');
+      
+      // First update our own state
+      setUser(userData as User);
+      
+      // Always redirect to recipe generator page after successful login
       setTimeout(() => {
-        navigate(intendedPath, { replace: true });
+        // Dispatch login event to notify the app
+        window.dispatchEvent(new CustomEvent('auth-state-changed', { 
+          detail: { 
+            action: 'login',
+            timestamp: Date.now(),
+            user: userData
+          }
+        }));
+        
+        console.log('Navigating to recipe generator page after successful login');
+        
+        // Always redirect to recipe generator after login
+        navigate('/recipe/generator');
+        showToast(`Welcome back, ${userData.username}!`, 'success');
       }, 100);
-    } catch (error: any) {
-      // Log error without sensitive data
-      console.error('Login failed:', error.message || 'Unknown error');
       
-      // Prepare a friendlyMessage property on the error object
-      // This will be used by the component to display an appropriate message
-      if (error.response?.status === 401) {
-        error.friendlyMessage = 'Invalid credentials';
-      } else if (error.response?.status === 403) {
-        error.friendlyMessage = 'Access forbidden. Check if CORS is properly configured on the server.';
-      } else if (error.message?.includes('Network Error')) {
-        error.friendlyMessage = 'Unable to connect to the server. Please check your internet connection.';
-      } else if (error.message?.includes('timeout')) {
-        error.friendlyMessage = 'Request timed out. Please try again later.';
-      } else if (error.message?.includes('CORS')) {
-        error.friendlyMessage = 'Connection issue with the server. Please try again later.';
-      } else if (error.message?.includes('token missing')) {
-        error.friendlyMessage = 'Authentication token missing from server response. Please contact support.';
-      } else if (error.message?.includes('user data missing')) {
-        error.friendlyMessage = 'User data missing from server response. Please contact support.';
-      } else if (!error.friendlyMessage) {
-        error.friendlyMessage = 'Login failed. Please try again.';
+      return { success: true };
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || 'Invalid credentials';
+      
+      // Check if the error message indicates a banned status
+      if (errorMessage.toLowerCase().includes('banned') || errorMessage.toLowerCase().includes('suspended')) {
+        // Set the banned flag in session storage
+        sessionStorage.setItem('account_banned', 'true');
+        
+        // Return with banned flag
+        return { 
+          success: false, 
+          error: 'Your account has been banned. Please contact support for assistance.',
+          isBanned: true
+        };
       }
       
-      // Add preserveForm flag to indicate we should keep form values
-      error.preserveForm = true;
-      
-      throw error;
-    } finally {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
+      return { 
+        success: false, 
+        error: errorMessage
+      };
     }
-  };
+  }, [navigate, updateUserState, showToast]);
 
-  // Registration function with improved error handling
-  const register = async (data: RegisterData): Promise<void> => {
-    setAuthState(prev => ({ ...prev, isLoading: true }));
+  // Signup function
+  const signup = useCallback(async (formData: SignupData): Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+    isDuplicate?: boolean;
+    duplicateEmail?: string;
+  }> => {
     try {
-      await authAPI.register(data);
-      showToast('Registration successful! Please check your email to verify your account.', 'success');
-      navigate('/registration-success', { state: { email: data.email, username: data.username } });
-    } catch (error: any) {
-      console.error('Registration failed:', error);
+      const response = await api.post<AuthResponse>('/api/v1/auth/signup', {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password
+      });
+      const data = response.data;
       
-      // Show appropriate error message based on response
-      if (error.response?.status === 409) {
-        showToast('This email is already registered.', 'error');
-      } else if (error.friendlyMessage) {
-        showToast(error.friendlyMessage, 'error');
-      } else {
-        showToast('Registration failed. Please try again.', 'error');
+      if (data?.success) {
+        showToast('Registration successful! Please check your email for verification.', 'success');
+        
+        navigate('/signup-success', { 
+          state: { 
+            email: formData.email,
+            username: formData.username 
+          } 
+        });
+        
+        return {
+          success: true,
+          message: 'Registration successful! Please check your email for verification.'
+        };
       }
       
-      throw error;
-    } finally {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
-    }
-  };
-
-  // Optimized logout function
-  const logout = useCallback((): void => {
-    // Start loading state
-    setAuthState(prev => ({ ...prev, isLoading: true }));
-    
-    // Get token before clearing storage - but don't clear it yet
-    const token = localStorage.getItem('authToken');
-    
-    // Update UI state immediately to give feedback to user
-    setAuthState(prev => ({ ...prev, user: null }));
-    
-    // Show success message
-    showToast('You have been logged out.', 'success');
-    
-    // Cancel all pending requests to prevent race conditions
-    cancelAllRequests();
-    
-    // Attempt server-side logout if token exists
-    if (token) {
-      console.log('Sending logout request to server with token');
+      return { success: false, error: 'Registration failed' };
+    } catch (error: any) {
+      // Handle duplicate user errors
+      if (error.response?.status === 409) {
+        const data = error.response.data;
+        const isDuplicateEmail = data?.message?.toLowerCase().includes('email already exists');
+        const isDuplicateUsername = data?.message?.toLowerCase().includes('username already exists');
+        
+        if (isDuplicateEmail || isDuplicateUsername) {
+          return {
+            success: false,
+            error: data.message || 'This email or username is already registered',
+            isDuplicate: true,
+            duplicateEmail: isDuplicateEmail ? formData.email : undefined
+          };
+        }
+      }
       
-      // Pass the raw token to the logout function
-      authAPI.logout(token)
-        .then(response => {
-          console.log('Server logout successful:', response);
-        })
-        .catch(err => {
-          console.log('Server logout had issues, error:', err);
-        })
-        .finally(() => {
-          // Only clear localStorage AFTER server request attempts
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('user');
-          localStorage.removeItem('cachedUserProfile');
-          
-          setAuthState(prev => ({ ...prev, isLoading: false }));
-          navigate('/signin', { replace: true });
-        });
-    } else {
-      console.log('No token available for server logout, completing local logout only');
-      
-      // For local logout, still clear localStorage
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      localStorage.removeItem('cachedUserProfile');
-      
-      setAuthState(prev => ({ ...prev, isLoading: false }));
-      navigate('/signin', { replace: true });
+      return { 
+        success: false, 
+        error: error.response?.data?.message || 'Registration failed' 
+      };
     }
   }, [navigate, showToast]);
 
-  // Context value with useMemo to prevent unnecessary re-renders
+  // Update username
+  const updateUsername = useCallback(async (currentPassword: string, newUsername: string): Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }> => {
+    if (!isAuthenticated) {
+      return { success: false, error: 'You must be logged in to update your username' };
+    }
+    
+    try {
+      console.log('Attempting to update username from', user?.username, 'to', newUsername);
+      
+      // Create request payload for both endpoint formats
+      const oldFormatPayload = {
+        currentPassword,
+        newUsername
+      };
+      
+      const newFormatPayload = {
+        currentPassword,
+        username: newUsername
+      };
+
+      // Add authorization header explicitly
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${auth.getToken()}`,
+          'Content-Type': 'application/json'
+        }
+      };
+      
+      try {
+        // First try new endpoint
+        console.log('Trying new username update endpoint');
+        const response = await api.post<{success: boolean; message?: string}>(
+          '/api/v1/auth/change-username', 
+          newFormatPayload,
+          config
+        );
+        const data = response.data;
+        
+        if (data?.success) {
+          // Update local user data
+          if (user) {
+            updateUserState({ ...user, username: newUsername });
+          }
+          
+          showToast('Username updated successfully', 'success');
+          return { success: true, message: 'Username updated successfully' };
+        }
+        
+        return { success: false, error: 'Failed to update username' };
+      } catch (primaryError: any) {
+        console.warn('First username endpoint failed, trying fallback:', primaryError);
+        
+        // Check for specific 403 error
+        if (primaryError?.response?.status === 403) {
+          const errorMsg = 'You do not have permission to change your username. Contact an administrator for assistance.';
+          showToast(errorMsg, 'error');
+          return { success: false, error: errorMsg };
+        }
+        
+        // If that fails, try old endpoint
+        try {
+          const response = await api.put<{success: boolean; message?: string}>(
+            '/api/v1/user/username', 
+            oldFormatPayload,
+            config
+          );
+          const data = response.data;
+          
+          if (data?.success) {
+            // Update local user data
+            if (user) {
+              updateUserState({ ...user, username: newUsername });
+            }
+            
+            showToast('Username updated successfully', 'success');
+            return { success: true, message: 'Username updated successfully' };
+          }
+          
+          return { success: false, error: 'Failed to update username' };
+        } catch (fallbackError: any) {
+          // Both endpoints failed
+          // Check for specific 403 error in fallback
+          if (fallbackError?.response?.status === 403) {
+            const errorMsg = 'You do not have permission to change your username. Contact an administrator for assistance.';
+            showToast(errorMsg, 'error');
+            return { success: false, error: errorMsg };
+          }
+          
+          console.error('Both username update endpoints failed:', fallbackError);
+          throw fallbackError;
+        }
+      }
+    } catch (error: any) {
+      console.error('Username update error:', error);
+      const errorMsg = error.response?.status === 403 
+        ? 'Permission denied: You cannot change your username. Contact an administrator.'
+        : error.response?.data?.message || 'Failed to update username';
+      
+      showToast(errorMsg, 'error');
+      return {
+        success: false,
+        error: errorMsg
+      };
+    }
+  }, [isAuthenticated, user, updateUserState, showToast]);
+
+  // Context value
   const contextValue = useMemo(() => ({
+    isAuthenticated,
     user,
-    isAuthenticated: !!user,
-    isAdmin: user?.role === 'ADMIN',
-    isLoading,
-    login,
-    register,
+    isLoading: false, // Always false since we removed loading state
+    isAdmin,
+    signin,
+    signup,
     logout,
-    checkAuth
-  }), [user, isLoading, login, register, logout, checkAuth]);
-
-  return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
-});
-
-// Add display name for debugging
-AuthProvider.displayName = 'AuthProvider';
-
-// Custom hook for using auth throughout the app
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    refreshUserData,
+    updateUsername,
+    checkAuth,
+  }), [
+    isAuthenticated, user, isAdmin,
+    signin, signup, logout, refreshUserData, updateUsername, checkAuth,
+  ]);
+  
+  try {
+    return (
+      <AuthContext.Provider value={contextValue}>
+        {children}
+      </AuthContext.Provider>
+    );
+  } catch (error) {
+    console.error('AuthProvider render error:', error);
+    return <div>Authentication Error. Please refresh the page.</div>;
   }
-  return context;
-}; 
+};
+
+// Custom hook to access the auth context
+export const useAuth = () => useContext(AuthContext);
+
+export default AuthContext;
+

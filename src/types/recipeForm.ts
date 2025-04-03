@@ -7,19 +7,21 @@ export interface IFormErrors {
   }
   
   export interface IMacros {
-    calories?: number;
-    protein?: number;
-    carbs?: number;
-    fat?: number;
+    calories: number;
+    protein: number;
+    carbohydrates: number;
+    fat: number;
   }
   
   export interface IRecipeFormData {
     mealName: string;
-    recipeDetails: string;
+    imageUrl: string;
     ingredientsUsed: string[];
-    imageFile: File | null;
+    recipeDetails: string;
     prepTimeMinutes?: number;
-    macros?: IMacros;
+    showPrepTime?: boolean;
+    macros?: IMacros | null;
+    showMacros?: boolean;
   }
   
   export interface IRecipePayload {

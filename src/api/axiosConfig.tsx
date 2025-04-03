@@ -1,5 +1,5 @@
 // axiosConfig.ts (or .tsx)
-import axios, { AxiosRequestConfig, CancelTokenSource } from 'axios';
+import axios, { AxiosRequestConfig, CancelTokenSource, AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 
 type ErrorStatusCode = 404 | 403 | 401 | 500 | 'network';
@@ -17,9 +17,12 @@ const ERROR_MESSAGES: ErrorMessages = {
   network: 'Network error'
 };
 
+// Only log in development environment
+const isDev = import.meta.env.DEV;
+
 // Create axios instance with base configuration
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8081/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8081',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
@@ -28,24 +31,57 @@ const apiClient = axios.create({
   withCredentials: true
 });
 
+// Generate a unique ID for request tracking
+const generateRequestId = (): string => uuidv4().slice(0, 8);
+
+// Optimized URL pattern matching for auth endpoints
+const AUTH_PATTERNS = [
+  '/api/v1/auth/signin', 
+  '/api/v1/auth/signup', 
+  '/api/v1/auth/logout',
+  '/api/v1/auth/refresh-token'
+];
+
+// Check if URL is an auth endpoint 
+const isAuthEndpoint = (url: string): boolean => {
+  return AUTH_PATTERNS.some(pattern => url.includes(pattern));
+};
+
+// Extend AxiosError with our custom properties
+interface EnhancedAxiosError extends AxiosError {
+  friendlyMessage?: string;
+}
+
 // Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
     // Add request ID for tracking
-    const requestId = uuidv4().slice(0, 8);
+    const requestId = generateRequestId();
     config.headers['X-Request-ID'] = requestId;
-
-    // Log request in development
-    console.log(`[${config.headers['X-Request-ID']}] Request:`, {
-      url: config.url,
-      method: config.method,
-      timestamp: new Date().toISOString()
-    });
 
     // Add auth token if available
     const token = localStorage.getItem('authToken');
     if (token) {
-      config.headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+      // Check token validity
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          const expiryTime = payload.exp * 1000;
+          
+          // Only use token if it's not expired
+          if (Date.now() < expiryTime) {
+            config.headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+          } else if (import.meta.env.DEV) {
+            console.warn('Expired token detected in request interceptor');
+          }
+        }
+      } catch (e) {
+        // Invalid token format, remove it silently
+        if (import.meta.env.DEV) {
+          console.error('Invalid token format:', e);
+        }
+      }
     }
 
     // Create cancel token for this request
@@ -57,10 +93,7 @@ apiClient.interceptors.request.use(
     
     return config;
   },
-  (error) => {
-    console.error('Request error:', error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 // Response interceptor
@@ -73,16 +106,9 @@ apiClient.interceptors.response.use(
       pendingRequests.delete(requestId);
     }
     
-    // Log response
-    console.log(`[${requestId}] Response:`, {
-      url: response.config.url,
-      status: response.status,
-      timestamp: new Date().toISOString()
-    });
-    
     return response;
   },
-  (error) => {
+  (error: EnhancedAxiosError) => {
     const requestId = error.config?.headers?.['X-Request-ID'] as string;
     
     // Remove the cancel token for failed requests
@@ -93,44 +119,78 @@ apiClient.interceptors.response.use(
     // Get error details
     const status = error.response?.status;
     const url = error.config?.url || '';
+    const isAuthUrl = isAuthEndpoint(url);
     
-    // Check if this is an auth-related endpoint - add more specific checks for login
-    const isLoginEndpoint = url.includes('/user/login') || url.includes('/login') || url.includes('/signin');
-    const isRegisterEndpoint = url.includes('/user/register') || url.includes('/register') || url.includes('/signup');
-    const isAuthEndpoint = isLoginEndpoint || isRegisterEndpoint || url.includes('/auth/');
-    
-    // Log all details of the error for better debugging
-    console.log('API Error Details:', { 
-      url,
-      status,
-      method: error.config?.method,
-      isLoginEndpoint,
-      isAuthEndpoint,
-      message: error.response?.data?.message || error.message,
-      data: error.response?.data,
-    });
-    
-    // Do not redirect on auth failures for auth endpoints 
-    if (status === 401 && !isAuthEndpoint) {
-      console.log('Redirecting to login due to 401 on protected route');
-      // Only redirect for non-auth endpoints
+    // Handle session expiration for non-auth endpoints
+    if (status === 401 && !isAuthUrl) {
+      // Clear session
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
+      localStorage.removeItem('cachedUserProfile');
+      sessionStorage.removeItem('user_session');
       
-      // Add a small delay before redirect
-      setTimeout(() => {
-        window.location.href = '/signin';
-      }, 300);
+      // Prevent multiple redirects by checking if we're already on the login page
+      if (!window.location.pathname.includes('/signin')) {
+        // Add a small delay before redirect
+        setTimeout(() => {
+          window.location.href = '/signin';
+        }, 300);
+      }
+    }
+
+    // Improve auth error messages
+    if (status === 401) {
+      if (isAuthUrl && url.includes('/signin')) {
+        error.friendlyMessage = 'Invalid credentials. Please check your username and password.';
+      } else {
+        error.friendlyMessage = 'Your session has expired. Please sign in again.';
+      }
+    } else if (status === 403) {
+      if (url.includes('/logout')) {
+        // Don't show an error for logout 403s, they're handled elsewhere
+        error.friendlyMessage = 'Successfully logged out';
+      } else {
+        error.friendlyMessage = 'You do not have permission to perform this action.';
+      }
     }
 
     // Add friendly error message
-    error.friendlyMessage = error.response 
-      ? (ERROR_MESSAGES[status as ErrorStatusCode] || error.response.data?.message || 'An error occurred')
-      : ERROR_MESSAGES.network;
+    if (!error.friendlyMessage) {
+      error.friendlyMessage = getReadableErrorMessage(error);
+    }
 
     return Promise.reject(error);
   }
 );
+
+// Helper to get error message from response
+function getErrorMessage(error: EnhancedAxiosError): string {
+  if (!error.response || !error.response.data) {
+    return error.message;
+  }
+  
+  const data = error.response.data;
+  if (typeof data === 'object' && data !== null && 'message' in data) {
+    return (data as any).message;
+  }
+  
+  return error.message;
+}
+
+// Helper to get user-friendly error messages
+function getReadableErrorMessage(error: EnhancedAxiosError): string {
+  if (!error.response) {
+    return ERROR_MESSAGES.network;
+  }
+  
+  const status = error.response.status;
+  
+  // Try to get a message from the response data
+  const responseMessage = getErrorMessage(error);
+  
+  // Return the most specific message available
+  return responseMessage || ERROR_MESSAGES[status as ErrorStatusCode] || `Error ${status}`;
+}
 
 // Function to cancel all pending requests
 export const cancelAllRequests = () => {
@@ -138,6 +198,16 @@ export const cancelAllRequests = () => {
     source.cancel(`Request ${requestId} cancelled by user`);
     pendingRequests.delete(requestId);
   });
+};
+
+// Export retry helper for failed requests
+export const retryRequest = async (failedRequest: any) => {
+  if (!failedRequest.config) {
+    throw new Error('Invalid request configuration');
+  }
+  
+  // Create a new request with the same config
+  return await apiClient(failedRequest.config);
 };
 
 export default apiClient;

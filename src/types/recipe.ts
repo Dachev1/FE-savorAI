@@ -13,20 +13,35 @@ export interface NutritionalInformation {
     nutritionalInformation: NutritionalInformation;
   }
   
+  export interface Macros {
+    calories?: number;
+    protein?: number;
+    proteinGrams?: number;
+    carbs?: number;
+    carbsGrams?: number;
+    fat?: number;
+    fatGrams?: number;
+  }
+  
   export interface RecipeResponse {
     id?: string;
     mealName: string;
+    title?: string;
     imageUrl?: string;
     ingredientsUsed: string[];
+    ingredients?: string[];
     recipeDetails: RecipeDetails | string;
+    description?: string;
+    instructions?: string;
     aiGenerated?: boolean;
     prepTimeMinutes?: number;
-    macros?: {
-      calories?: number;
-      protein?: number;
-      carbs?: number;
-      fat?: number;
+    macros?: Macros;
+    author?: {
+      id?: string;
+      username?: string;
     };
+    createdAt?: string;
+    updatedAt?: string;
   }
   
   export type GeneratedMealResponse = RecipeResponse;

@@ -2,8 +2,8 @@ import React from 'react';
 import { IMacros } from '../../../types/recipeForm';
 
 interface MacrosInputProps {
-  macros: IMacros | undefined;
-  setMacros: React.Dispatch<React.SetStateAction<IMacros | undefined>>;
+  macros: IMacros;
+  setMacros: React.Dispatch<React.SetStateAction<IMacros>>;
   showMacros: boolean;
   setShowMacros: React.Dispatch<React.SetStateAction<boolean>>;
 }
@@ -18,8 +18,8 @@ const MacrosInput: React.FC<MacrosInputProps> = ({
     const numValue = value === '' ? undefined : parseFloat(value);
     
     setMacros((prev) => ({
-      ...(prev || { calories: undefined, protein: undefined, carbs: undefined, fat: undefined }),
-      [field]: numValue,
+      ...(prev || { calories: 0, protein: 0, carbohydrates: 0, fat: 0 }),
+      [field]: numValue || 0,
     }));
   };
 
@@ -76,13 +76,13 @@ const MacrosInput: React.FC<MacrosInputProps> = ({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Carbs (g)
+              Carbohydrates (g)
             </label>
             <input
               type="number"
               step="0.1"
-              value={macros?.carbs ?? ''}
-              onChange={(e) => handleMacrosChange('carbs', e.target.value)}
+              value={macros?.carbohydrates ?? ''}
+              onChange={(e) => handleMacrosChange('carbohydrates', e.target.value)}
               className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-300"
               placeholder="e.g. 30.2"
             />

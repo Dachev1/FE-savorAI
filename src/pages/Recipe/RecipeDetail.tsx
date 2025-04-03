@@ -3,6 +3,9 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { LoadingSpinner, MacrosDisplay } from '../../components/common';
+import CommentList from '../../components/comments/CommentList';
+import { FaHeart, FaRegHeart } from 'react-icons/fa';
+import favoriteService from '../../services/favoriteService';
 
 interface Recipe {
   id: string;
@@ -24,6 +27,7 @@ interface Recipe {
   };
   tags: string[];
   createdAt: string;
+  commentCount?: number;
 }
 
 const RecipeDetail: React.FC = () => {
@@ -33,6 +37,8 @@ const RecipeDetail: React.FC = () => {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const fetchRecipe = async () => {
@@ -54,6 +60,21 @@ const RecipeDetail: React.FC = () => {
     }
   }, [id]);
 
+  useEffect(() => {
+    const checkFavoriteStatus = async () => {
+      if (!user || !recipe?.id) return;
+      
+      try {
+        const status = await favoriteService.checkFavorite(recipe.id);
+        setIsFavorite(status);
+      } catch (error) {
+        console.error('Failed to check favorite status:', error);
+      }
+    };
+    
+    checkFavoriteStatus();
+  }, [recipe?.id, user]);
+
   const handleDelete = async () => {
     if (!window.confirm('Are you sure you want to delete this recipe?')) {
       return;
@@ -65,6 +86,25 @@ const RecipeDetail: React.FC = () => {
     } catch (err) {
       console.error('Error deleting recipe:', err);
       alert('Failed to delete recipe. Please try again.');
+    }
+  };
+
+  const toggleFavorite = async () => {
+    if (!user || !recipe?.id) {
+      navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
+    
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    try {
+      const newStatus = await favoriteService.toggleFavorite(recipe.id);
+      setIsFavorite(newStatus);
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -116,6 +156,20 @@ const RecipeDetail: React.FC = () => {
             <span className="mx-2">•</span>
             <span>{new Date(recipe.createdAt).toLocaleDateString()}</span>
           </div>
+          <button
+            onClick={toggleFavorite}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/90 dark:bg-gray-800/90 shadow hover:bg-white dark:hover:bg-gray-700 transition-colors"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <div className="animate-pulse">
+                {isFavorite ? <FaHeart className="text-red-500" /> : <FaRegHeart />}
+              </div>
+            ) : (
+              isFavorite ? <FaHeart className="text-red-500" /> : <FaRegHeart />
+            )}
+            <span>{isFavorite ? 'Saved to Favorites' : 'Add to Favorites'}</span>
+          </button>
         </div>
 
         {/* Actions bar */}
@@ -196,6 +250,9 @@ const RecipeDetail: React.FC = () => {
             ))}
           </ol>
         </div>
+
+        {/* Comments section */}
+        {id && <CommentList recipeId={id} />}
       </article>
     </div>
   );

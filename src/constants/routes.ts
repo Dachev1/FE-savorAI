@@ -1,0 +1,6 @@
+// ... existing code ...
+
+// Add this to your ROUTES object
+export const FAVORITES = '/favorites';
+
+// ... existing code ... 

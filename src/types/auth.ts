@@ -41,14 +41,4 @@ export interface LoginData {
   email?: string; // Keep for backwards compatibility
   password: string;
   rememberMe: boolean;
-}
-
-export interface ResetPasswordData {
-  email: string;
-}
-
-export interface UpdatePasswordData {
-  token: string;
-  password: string;
-  passwordConfirmation: string;
 } 
