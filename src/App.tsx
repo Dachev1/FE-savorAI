@@ -1,14 +1,21 @@
 // src/App.tsx
-import React, { Suspense, lazy, memo, useEffect, useState, useCallback, useRef } from 'react';
-import { Routes, Route, Navigate, useLocation, useNavigate, Link } from 'react-router-dom';
+import React, { Suspense, lazy, memo, useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import { LoadingSpinner } from './components/common';
-import { useAuth } from './context/AuthContext';
+import { useAuth } from './context';
 import { ROUTES } from './routes';
 import AuthCleaner from './components/AuthCleaner';
 import auth from './utils/auth';
 import ErrorBoundary from './components/common/ErrorBoundary';
-import { FaHeart } from 'react-icons/fa';
+import { useConnectionQuality } from './hooks';
+
+// Define the gtag function for TypeScript
+declare global {
+  interface Window {
+    gtag?: (command: string, action: string, params: object) => void;
+  }
+}
 
 // Lazily loaded components
 const Home = lazy(() => import('./pages/Home'));
@@ -22,17 +29,26 @@ const RecipeGenerator = lazy(() => import('./pages/Recipe/RecipeGenerator'));
 const RecipeDetail = lazy(() => import('./pages/Recipe/RecipeDetail'));
 const RecipeCreate = lazy(() => import('./pages/Recipe/RecipeCreate'));
 const UserRecipes = lazy(() => import('./pages/Recipe/UserRecipes'));
+const AllRecipes = lazy(() => import('./pages/Recipe/AllRecipes'));
 const AccountSettings = lazy(() => import('./pages/Profile/AccountSettings'));
 const Error = lazy(() => import('./pages/Error'));
 const AdminDashboard = lazy(() => import('./pages/Admin/AdminDashboard'));
 const FavoritesPage = lazy(() => import('./pages/Favorites/FavoritesPage'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
-// Loading and error components
-const PageLoading = memo(() => (
-  <div className="flex justify-center items-center min-h-[50vh]">
-    <LoadingSpinner size="large" />
-  </div>
-));
+// Loading component with connection-aware optimization
+const PageLoading = memo(() => {
+  const { isLowBandwidth } = useConnectionQuality();
+  
+  return (
+    <div className="flex justify-center items-center min-h-[50vh]">
+      <LoadingSpinner 
+        size={isLowBandwidth ? "medium" : "large"} 
+        className={isLowBandwidth ? "text-gray-600" : "text-blue-600"}
+      />
+    </div>
+  );
+});
 PageLoading.displayName = 'PageLoading';
 
 // Redirect component for old login path
@@ -46,7 +62,7 @@ LoginRedirect.displayName = 'LoginRedirect';
 // Define a minimum interval between role verifications
 const ROLE_VERIFICATION_INTERVAL = 60000; // 1 minute
 
-// Simplified protected route with instant role verification
+// Protected route component
 const ProtectedRoute = memo(({ 
   element, 
   requiresAuth = true,
@@ -58,15 +74,12 @@ const ProtectedRoute = memo(({
 }) => {
   const { isAuthenticated, isAdmin } = useAuth();
   
-  // Immediately check conditions without additional API calls
   if ((requiresAuth && !isAuthenticated) || (requiresAdmin && !isAdmin)) {
-    // Store the attempted URL to redirect back after authentication
     if (requiresAuth && !isAuthenticated) {
       sessionStorage.setItem('pending_redirect', window.location.pathname);
       return <Navigate to="/signin" replace />;
     }
     
-    // If admin is required but user isn't admin
     if (requiresAdmin && !isAdmin) {
       return <Navigate to="/" replace />;
     }
@@ -76,7 +89,7 @@ const ProtectedRoute = memo(({
 });
 ProtectedRoute.displayName = 'ProtectedRoute';
 
-// Redirect authenticated users away from public auth pages
+// Redirect authenticated users away from auth pages
 const PublicAuthRoute = memo(({ 
   element
 }: { 
@@ -84,7 +97,6 @@ const PublicAuthRoute = memo(({
 }) => {
   const { isAuthenticated } = useAuth();
   
-  // Redirect authenticated users to home page
   if (isAuthenticated) {
     return <Navigate to={ROUTES.HOME} replace />;
   }
@@ -93,130 +105,120 @@ const PublicAuthRoute = memo(({
 });
 PublicAuthRoute.displayName = 'PublicAuthRoute';
 
-const createTimeout = (ms: number): Promise<never> => {
-  return new Promise((_, reject) => {
-    setTimeout(() => {
-      reject('Refresh timeout');
-    }, ms);
-  });
+// Simplified performance reporting
+const reportPerformance = (metric: string, value: number) => {
+  if (window.gtag) {
+    window.gtag('event', metric, {
+      value: Math.round(value),
+      event_category: 'Performance',
+      non_interaction: true,
+    });
+  }
 };
 
 function App() {
-  // Comment the line below to reduce console noise
-  // console.log('App component rendering');
   const { isAuthenticated, refreshUserData, isAdmin, user } = useAuth();
   const [isInitializing, setIsInitializing] = useState(true);
-  const timeoutRef = useRef<number | null>(null);
   const lastRefreshTime = useRef<number>(0);
   const lastRoleVerificationTime = useRef<number>(0);
   const isInitialRender = useRef(true);
-  const MIN_REFRESH_INTERVAL = 2000; // minimum 2 seconds between refreshes
+  const refreshPending = useRef(false);
+  const MIN_REFRESH_INTERVAL = 5000;
   const navigate = useNavigate();
   const location = useLocation();
+  const prevPathRef = useRef(location.pathname);
   
   // Verify user roles for sensitive routes
   const verifyUserRole = useCallback(async () => {
-    // Force token refresh on admin routes
+    if (Date.now() - lastRoleVerificationTime.current < ROLE_VERIFICATION_INTERVAL) {
+      return;
+    }
+    
     if (location.pathname.startsWith('/admin')) {
       auth.forceTokenRefresh();
     }
     
-    // Skip verification if:
-    // 1. User is not authenticated
-    // 2. We verified recently (but always verify for admin routes)
-    // 3. User is not on an admin route
     const isAdminRoute = location.pathname.startsWith('/admin');
-    if (!isAuthenticated || 
-        (!isAdminRoute && Date.now() - lastRoleVerificationTime.current < ROLE_VERIFICATION_INTERVAL)) {
+    if (!isAuthenticated || (!isAdminRoute && Date.now() - lastRoleVerificationTime.current < ROLE_VERIFICATION_INTERVAL)) {
       return;
     }
     
-    // Always refresh on admin routes, or if needed for protected routes
     if (isAdminRoute || isAdmin === undefined || lastRoleVerificationTime.current === 0) {
       const success = await refreshUserData();
       lastRoleVerificationTime.current = Date.now();
       
-      // If refresh was successful and user is not an admin but trying to access admin routes
       if (success && !isAdmin && isAdminRoute) {
         navigate('/');
       }
     }
   }, [isAuthenticated, isAdmin, location.pathname, navigate, refreshUserData]);
   
-  // Run role verification on route changes
-  useEffect(() => {
-    // Only run when route changes, not on every render
-    // And prevent running on initial render
-    if (isInitialRender.current) {
-      isInitialRender.current = false;
-      return;
-    }
-    
-    // Only verify roles for admin pages
-    if (location.pathname.startsWith('/admin')) {
-      verifyUserRole();
-    }
-  }, [location.pathname, verifyUserRole]);
-  
-  // Listen for role change events
-  useEffect(() => {
-    const handleRoleChange = () => {
-      // Update our verification timestamp to prevent duplicate checks
-      lastRoleVerificationTime.current = Date.now();
-    };
-    
-    window.addEventListener('user-role-changed', handleRoleChange);
-    return () => window.removeEventListener('user-role-changed', handleRoleChange);
-  }, [navigate]);
-
-  // Handle authentication state changes event for inter-component communication
+  // Handle authentication state changes with better debouncing
   const handleAuthStateChange = useCallback((event: Event) => {
     const customEvent = event as CustomEvent;
     const detail = customEvent.detail || {};
-    
-    // Store the event source for debugging
     const source = detail.source || 'unknown';
+    const action = detail.action || '';
     
-    // Force token refresh on auth state change
-    auth.forceTokenRefresh();
+    const now = Date.now();
+    if (now - lastRefreshTime.current < MIN_REFRESH_INTERVAL && user) {
+      return;
+    }
     
-    // Don't refresh user data on network errors or unauthorized events
-    // These are handled separately
+    if (refreshPending.current) {
+      return;
+    }
+    
+    if (['login', 'auth-restored', 'role-changed'].includes(action)) {
+      auth.forceTokenRefresh();
+    }
+    
     if (detail.reason === 'unauthorized' || detail.reason === 'network-error') {
       return;
     }
     
-    // Skip refreshes from ourselves to avoid loops
     if (source === 'app-component') {
       return;
     }
     
-    // If role changed, refresh immediately regardless of timing
-    if (detail.roleChanged) {
-      lastRoleVerificationTime.current = Date.now();
-      refreshUserData();
+    if (action === 'role-changed' || detail.roleChanged) {
+      lastRoleVerificationTime.current = now;
+      refreshPending.current = true;
+      
+      setTimeout(() => {
+        refreshUserData().finally(() => {
+          lastRefreshTime.current = Date.now();
+          refreshPending.current = false;
+        });
+      }, 50);
       return;
     }
     
-    // If username changed, refresh immediately
-    if (detail.usernameChanged) {
-      refreshUserData();
+    if (action === 'username-changed' || detail.usernameChanged) {
+      refreshPending.current = true;
+      
+      setTimeout(() => {
+        refreshUserData().finally(() => {
+          lastRefreshTime.current = Date.now();
+          refreshPending.current = false;
+        });
+      }, 50);
       return;
     }
     
-    // Skip additional refreshes if we recently refreshed
-    const now = Date.now();
-    const timeSinceLastRefresh = now - lastRefreshTime.current;
-    
-    // Use a higher threshold (5 seconds) to prevent rapid refreshes
-    if (timeSinceLastRefresh < 5000 && user) {
-      return;
+    if (!refreshPending.current) {
+      refreshPending.current = true;
+      
+      setTimeout(() => {
+        refreshUserData().finally(() => {
+          lastRefreshTime.current = Date.now();
+          refreshPending.current = false;
+        });
+      }, 100);
     }
-    
-    // Refresh user data
-    refreshUserData();
-  }, [refreshUserData, user, isAuthenticated]);
+  }, [refreshUserData, user]);
 
+  // Initialize app with auth check - only on first mount
   useEffect(() => {
     const initializeApp = async () => {
       try {
@@ -231,62 +233,58 @@ function App() {
           return;
         }
 
-        await Promise.race([
-          refreshUserData(),
-          createTimeout(5000)
-        ]);
+        const initTimeout = setTimeout(() => {
+          setIsInitializing(false);
+        }, 3000);
 
-        // Update timestamps
+        await refreshUserData();
+
         lastRefreshTime.current = Date.now();
         lastRoleVerificationTime.current = Date.now();
+        
+        clearTimeout(initTimeout);
       } catch (error) {
         console.error('Error during initialization:', error);
       } finally {
-        // Always set initializing to false
         setIsInitializing(false);
       }
     };
 
-    // Start initialization
     initializeApp();
-
-    // Set up auth state change listener
     window.addEventListener('auth-state-changed', handleAuthStateChange);
     
-    // Clean up
     return () => {
       window.removeEventListener('auth-state-changed', handleAuthStateChange);
-      if (timeoutRef.current) {
-        window.clearTimeout(timeoutRef.current);
-      }
     };
-  }, [refreshUserData, user, handleAuthStateChange]);
+  }, [handleAuthStateChange, refreshUserData, user]);
   
   // Handle network status changes
   useEffect(() => {
     const handleOnline = () => {
-      // Only refresh if authenticated and not refreshed recently
-      if (auth.isTokenValid() && isAuthenticated) {
+      if (auth.isTokenValid() && isAuthenticated && !refreshPending.current) {
         const now = Date.now();
-        if (now - lastRefreshTime.current > MIN_REFRESH_INTERVAL) {
-          refreshUserData();
+        if (now - lastRefreshTime.current > 30000) {
+          refreshPending.current = true;
+          setTimeout(() => {
+            refreshUserData().finally(() => {
+              lastRefreshTime.current = Date.now();
+              refreshPending.current = false;
+            });
+          }, 2000);
         }
       }
     };
     
     window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', () => {});
     
     return () => {
       window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', () => {});
     };
   }, [refreshUserData, isAuthenticated]);
 
   // Dispatch auth-restored event on mount if user is already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      // Small delay to allow components to initialize
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('auth-state-changed', { 
           detail: { 
@@ -299,71 +297,195 @@ function App() {
     }
   }, [isAuthenticated, user]);
 
-  if (isInitializing) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-100"><LoadingSpinner size="large" /></div>;
-  }
-
-  return (
-    <div className="app-container">
-      {/* Authentication monitor - invisible component checking for banned users */}
-      <AuthCleaner />
+  // Register basic performance monitoring
+  useEffect(() => {
+    if ('performance' in window) {
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          if (performance.timing) {
+            const pageLoadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
+            reportPerformance('page-load', pageLoadTime);
+            
+            const domContentLoaded = performance.timing.domContentLoadedEventEnd - performance.timing.navigationStart;
+            reportPerformance('dom-content-loaded', domContentLoaded);
+            
+            const firstPaint = performance.timing.responseStart - performance.timing.navigationStart;
+            reportPerformance('first-paint', firstPaint);
+          }
+          
+          if (performance.getEntriesByType) {
+            const paintMetrics = performance.getEntriesByType('paint');
+            paintMetrics.forEach(metric => {
+              reportPerformance(metric.name, metric.startTime);
+            });
+          }
+        }, 0);
+      });
+    }
+  }, []);
+  
+  // Optimize scroll performance
+  useEffect(() => {
+    let ticking = false;
+    
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+  
+  // Prefetch common routes
+  useEffect(() => {
+    if ('requestIdleCallback' in window) {
+      const idleCallback = window.requestIdleCallback(() => {
+        const prefetchPromises = [
+          import('./pages/Home'),
+          import('./pages/Recipe/RecipeCreate')
+        ];
+        
+        Promise.allSettled(prefetchPromises).catch(() => {});
+      }, { timeout: 2000 });
       
+      return () => {
+        if ('cancelIdleCallback' in window) {
+          window.cancelIdleCallback(idleCallback);
+        }
+      };
+    }
+  }, []);
+
+  // Optimize the verification of roles on route changes - combined route change handler
+  useEffect(() => {
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      prevPathRef.current = location.pathname;
+      return;
+    }
+    
+    if (prevPathRef.current === location.pathname) {
+      return;
+    }
+    
+    prevPathRef.current = location.pathname;
+    
+    if (Date.now() - lastRoleVerificationTime.current < 10000) {
+      return;
+    }
+    
+    const path = location.pathname;
+    if (path.startsWith('/admin')) {
+      verifyUserRole();
+    }
+  }, [location.pathname, verifyUserRole]);
+
+  // Preload frequently accessed lazy components
+  useEffect(() => {
+    // Preload most common components to avoid suspense during navigation
+    const preloadComponents = async () => {
+      if (isAuthenticated) {
+        // Preload authenticated user components
+        await Promise.all([
+          import('./pages/Recipe/RecipeGenerator'),
+          import('./pages/Recipe/UserRecipes')
+        ]);
+      } else {
+        // Preload public components
+        await Promise.all([
+          import('./pages/Home'),
+          import('./pages/About/About')
+        ]);
+      }
+    };
+    
+    // Wait until after initial render
+    const timer = setTimeout(() => {
+      preloadComponents().catch(() => {});
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [isAuthenticated]);
+
+  // Memoize the Routes component to prevent unnecessary re-renders
+  const AppRoutes = useMemo(() => (
+    <Routes>
+      <Route path="/" element={isAuthenticated ? <Navigate to="/recipe/generator" replace /> : <Home />} />
+      <Route path={ROUTES.ABOUT} element={<About />} />
+      <Route path={ROUTES.CONTACT} element={<Contact />} />
+      <Route path={ROUTES.CONTACT_SUCCESS} element={<ContactSuccess />} />
+      
+      <Route path={ROUTES.SIGN_IN} element={<PublicAuthRoute element={<SignIn />} />} />
+      <Route path={ROUTES.SIGN_UP} element={<PublicAuthRoute element={<SignUp />} />} />
+      <Route path={ROUTES.SIGNUP_SUCCESS} element={<PublicAuthRoute element={<SignupSuccess />} />} />
+      
+      <Route path="/login" element={<PublicAuthRoute element={<LoginRedirect />} />} />
+      <Route path="/registration-success" element={<Navigate to="/signup-success" replace />} />
+      
+      <Route 
+        path={ROUTES.RECIPE_GENERATOR} 
+        element={<ProtectedRoute element={<RecipeGenerator />} />} 
+      />
+      <Route 
+        path={ROUTES.RECIPE_DETAIL} 
+        element={<ProtectedRoute element={<RecipeDetail />} />} 
+      />
+      <Route 
+        path={ROUTES.RECIPE_CREATE} 
+        element={<ProtectedRoute element={<RecipeCreate />} />} 
+      />
+      <Route 
+        path={ROUTES.RECIPE_EDIT} 
+        element={<ProtectedRoute element={<RecipeCreate />} />} 
+      />
+      <Route 
+        path={ROUTES.USER_RECIPES} 
+        element={<ProtectedRoute element={<UserRecipes />} />} 
+      />
+      <Route 
+        path={ROUTES.ALL_RECIPES} 
+        element={<ProtectedRoute element={<AllRecipes />} />} 
+      />
+      <Route 
+        path={ROUTES.ACCOUNT_SETTINGS} 
+        element={<ProtectedRoute element={<AccountSettings />} />} 
+      />
+      
+      <Route 
+        path="/favorites" 
+        element={<ProtectedRoute element={<FavoritesPage />} />} 
+      />
+      
+      <Route 
+        path={ROUTES.ADMIN_DASHBOARD} 
+        element={<ProtectedRoute element={<AdminDashboard />} requiresAdmin={true} />} 
+      />
+      
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  ), [isAuthenticated]);
+
+  if (isInitializing) {
+    return <PageLoading />;
+  }
+  
+  return (
+    <div>
+      <AuthCleaner />
       <Layout>
         <ErrorBoundary>
-          <Suspense fallback={<PageLoading />}>
-            <Routes key={`routes-${isAuthenticated ? 'authenticated' : 'unauthenticated'}-${location.pathname}`}>
-              {/* Public routes - Home is now conditional */}
-              <Route path="/" element={isAuthenticated ? <Navigate to="/recipe/generator" replace /> : <Home />} />
-              <Route path={ROUTES.ABOUT} element={<About />} />
-              <Route path={ROUTES.CONTACT} element={<Contact />} />
-              <Route path={ROUTES.CONTACT_SUCCESS} element={<ContactSuccess />} />
-              
-              {/* Auth routes */}
-              <Route path={ROUTES.SIGN_IN} element={<PublicAuthRoute element={<SignIn />} />} />
-              <Route path={ROUTES.SIGN_UP} element={<PublicAuthRoute element={<SignUp />} />} />
-              <Route path={ROUTES.SIGNUP_SUCCESS} element={<PublicAuthRoute element={<SignupSuccess />} />} />
-              
-              {/* Redirects */}
-              <Route path="/login" element={<PublicAuthRoute element={<LoginRedirect />} />} />
-              <Route path="/registration-success" element={<Navigate to="/signup-success" replace />} />
-              
-              {/* Protected routes */}
-              <Route 
-                path={ROUTES.RECIPE_GENERATOR} 
-                element={<ProtectedRoute element={<RecipeGenerator />} />} 
-              />
-              <Route 
-                path={ROUTES.RECIPE_DETAIL} 
-                element={<ProtectedRoute element={<RecipeDetail />} />} 
-              />
-              <Route 
-                path={ROUTES.RECIPE_CREATE} 
-                element={<ProtectedRoute element={<RecipeCreate />} />} 
-              />
-              <Route 
-                path={ROUTES.USER_RECIPES} 
-                element={<ProtectedRoute element={<UserRecipes />} />} 
-              />
-              <Route 
-                path={ROUTES.ACCOUNT_SETTINGS} 
-                element={<ProtectedRoute element={<AccountSettings />} />} 
-              />
-              
-              {/* Favorites Route */}
-              <Route 
-                path="/favorites" 
-                element={<ProtectedRoute element={<FavoritesPage />} />} 
-              />
-              
-              {/* Admin routes */}
-              <Route 
-                path={ROUTES.ADMIN_DASHBOARD} 
-                element={<ProtectedRoute element={<AdminDashboard />} requiresAdmin={true} />} 
-              />
-              
-              {/* Catch-all / 404 route */}
-              <Route path="*" element={<Error />} />
-            </Routes>
+          <Suspense fallback={<div className="min-h-[50vh] flex items-center justify-center opacity-70 transition-opacity duration-300">
+            <PageLoading />
+          </div>}>
+            {AppRoutes}
           </Suspense>
         </ErrorBoundary>
       </Layout>

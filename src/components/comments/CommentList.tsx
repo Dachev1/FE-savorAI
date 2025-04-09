@@ -1,229 +1,211 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FaComment, FaEdit, FaTrash } from 'react-icons/fa';
-import commentService, { Comment } from '../../services/CommentService';
-import { useAuth } from '../../context/AuthContext';
-import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context';
+import axios from '../../api/axiosConfig';
+import { FaUser, FaClock, FaTrash, FaPaperPlane } from 'react-icons/fa';
+
+interface Comment {
+  id: string;
+  content: string;
+  userId: string;
+  username: string;
+  createdAt: string;
+}
 
 interface CommentListProps {
   recipeId: string;
 }
 
 const CommentList: React.FC<CommentListProps> = ({ recipeId }) => {
+  const { user, isAuthenticated } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [currentPage, setCurrentPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState('');
-  const [editingComment, setEditingComment] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState('');
-  
-  const { isAuthenticated } = useAuth();
-  const { showToast } = useToast();
-  
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch comments for the recipe
   const fetchComments = useCallback(async () => {
-    if (!showComments || !recipeId) return;
+    if (!recipeId) return;
     
     setIsLoading(true);
-    setError('');
+    setError(null);
     
     try {
-      const result = await commentService.getComments(recipeId, currentPage);
-      setComments(result.content);
-      setTotalPages(result.totalPages);
+      const response = await axios.get(`/v1/comments/${recipeId}`);
+      setComments(response.data || []);
     } catch (err) {
-      setError('Failed to load comments');
-      console.error(err);
+      console.error('Failed to fetch comments:', err);
+      setError('Unable to load comments. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, [recipeId, currentPage, showComments]);
-  
+  }, [recipeId]);
+
+  // Load comments on component mount
   useEffect(() => {
     fetchComments();
   }, [fetchComments]);
-  
-  const toggleComments = () => {
-    setShowComments(prev => !prev);
-  };
-  
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-  
+
+  // Submit a new comment
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newComment.trim()) return;
+    if (!isAuthenticated) {
+      setError('You must be signed in to comment.');
+      return;
+    }
+    
+    if (!newComment.trim()) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setError(null);
     
     try {
-      const addedComment = await commentService.addComment(recipeId, newComment);
-      setComments(prev => [addedComment, ...prev]);
-      setNewComment('');
-      showToast('Comment added successfully', 'success');
-    } catch (err) {
-      showToast('Failed to add comment', 'error');
-      console.error(err);
-    }
-  };
-  
-  const handleEditComment = (comment: Comment) => {
-    setEditingComment(comment.id);
-    setEditContent(comment.content);
-  };
-  
-  const handleUpdateComment = async (commentId: string) => {
-    if (!editContent.trim()) return;
-    
-    try {
-      const updatedComment = await commentService.updateComment(recipeId, commentId, editContent);
-      setComments(prev => prev.map(c => c.id === commentId ? updatedComment : c));
-      setEditingComment(null);
-      setEditContent('');
-      showToast('Comment updated successfully', 'success');
-    } catch (err) {
-      showToast('Failed to update comment', 'error');
-      console.error(err);
-    }
-  };
-  
-  const handleDeleteComment = async (commentId: string) => {
-    if (!window.confirm('Are you sure you want to delete this comment?')) return;
-    
-    try {
-      await commentService.deleteComment(recipeId, commentId);
-      setComments(prev => prev.filter(c => c.id !== commentId));
-      showToast('Comment deleted successfully', 'success');
-    } catch (err) {
-      showToast('Failed to delete comment', 'error');
-      console.error(err);
-    }
-  };
-  
-  return (
-    <div className="mt-8 border-t border-gray-200 pt-6">
-      <button 
-        onClick={toggleComments}
-        className="flex items-center text-blue-600 mb-4 hover:text-blue-800 transition"
-      >
-        <FaComment className="mr-2" />
-        {showComments ? 'Hide Comments' : 'Show Comments'}
-      </button>
+      const response = await axios.post('/v1/comments', {
+        recipeId,
+        content: newComment.trim()
+      });
       
-      {showComments && (
-        <div className="space-y-4">
-          {isAuthenticated && (
-            <form onSubmit={handleSubmitComment} className="mb-6">
-              <div className="flex flex-col">
-                <textarea
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Add a comment..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={3}
-                />
-                <button
-                  type="submit"
-                  disabled={!newComment.trim()}
-                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md self-end hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                >
-                  Post Comment
-                </button>
-              </div>
-            </form>
-          )}
-          
-          {isLoading ? (
-            <div className="flex justify-center py-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+      // Add the new comment to the list
+      setComments(prevComments => [response.data, ...prevComments]);
+      
+      // Clear the input
+      setNewComment('');
+    } catch (err) {
+      console.error('Failed to submit comment:', err);
+      setError('Failed to submit your comment. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Delete a comment
+  const handleDeleteComment = async (commentId: string) => {
+    if (!isAuthenticated) return;
+    
+    try {
+      await axios.delete(`/v1/comments/${commentId}`);
+      
+      // Remove the deleted comment from the list
+      setComments(prevComments => 
+        prevComments.filter(comment => comment.id !== commentId)
+      );
+    } catch (err) {
+      console.error('Failed to delete comment:', err);
+      setError('Failed to delete comment. Please try again.');
+    }
+  };
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden mt-8">
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-4">
+        <h3 className="text-lg font-semibold text-white">Comments</h3>
+      </div>
+      
+      {/* Comment form */}
+      {isAuthenticated && (
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <form onSubmit={handleSubmitComment} className="flex flex-col">
+            <textarea
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Add a comment..."
+              className="w-full p-3 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-800 dark:text-white resize-none"
+              rows={3}
+              disabled={isSubmitting}
+            />
+            <div className="flex justify-end mt-2">
+              <button
+                type="submit"
+                disabled={isSubmitting || !newComment.trim()}
+                className={`px-4 py-2 rounded-lg flex items-center ${
+                  !newComment.trim() || isSubmitting
+                    ? 'bg-gray-300 dark:bg-gray-600 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                } transition-colors`}
+              >
+                <FaPaperPlane className="mr-2" />
+                {isSubmitting ? 'Posting...' : 'Post Comment'}
+              </button>
             </div>
-          ) : error ? (
-            <div className="text-red-500 text-center py-4">{error}</div>
-          ) : comments.length === 0 ? (
-            <div className="text-gray-500 text-center py-4">No comments yet. Be the first to comment!</div>
-          ) : (
-            <div className="space-y-4">
-              {comments.map(comment => (
-                <div key={comment.id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                  {editingComment === comment.id ? (
-                    <div className="space-y-2">
-                      <textarea
-                        value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        rows={3}
-                      />
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => setEditingComment(null)}
-                          className="px-3 py-1 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => handleUpdateComment(comment.id)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                          Save
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex justify-between">
-                        <div className="font-medium text-blue-800 dark:text-blue-300">{comment.username}</div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(comment.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                      <p className="mt-2 text-gray-700 dark:text-gray-300">{comment.content}</p>
-                      {comment.isOwner && (
-                        <div className="mt-2 flex justify-end space-x-2">
-                          <button
-                            onClick={() => handleEditComment(comment)}
-                            className="text-blue-600 hover:text-blue-800"
-                            aria-label="Edit comment"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteComment(comment.id)}
-                            className="text-red-600 hover:text-red-800"
-                            aria-label="Delete comment"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              ))}
-              
-              {totalPages > 1 && (
-                <div className="flex justify-center mt-4">
-                  <div className="flex space-x-2">
-                    {Array.from({ length: totalPages }, (_, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handlePageChange(i)}
-                        className={`px-3 py-1 rounded-md ${
-                          currentPage === i
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                      >
-                        {i + 1}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          </form>
         </div>
       )}
+      
+      {/* Error message */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-300 p-4 mx-4 my-3 rounded-lg">
+          <p>{error}</p>
+        </div>
+      )}
+      
+      {/* Comments list */}
+      <div className="p-4">
+        {isLoading ? (
+          <div className="text-center py-8">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent"></div>
+            <p className="mt-2 text-gray-500 dark:text-gray-400">Loading comments...</p>
+          </div>
+        ) : comments.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-500 dark:text-gray-400">No comments yet. Be the first to share your thoughts!</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {comments.map(comment => (
+              <div 
+                key={comment.id} 
+                className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center">
+                    <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-full">
+                      <FaUser className="text-blue-500" />
+                    </div>
+                    <div className="ml-2">
+                      <p className="font-medium text-gray-800 dark:text-white">
+                        {comment.username}
+                      </p>
+                      <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                        <FaClock className="mr-1" />
+                        <span>{formatDate(comment.createdAt)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Delete button for user's own comments or recipe owner */}
+                  {user && (user.id === comment.userId || recipeId === user.id) && (
+                    <button
+                      onClick={() => handleDeleteComment(comment.id)}
+                      className="text-red-500 hover:text-red-700 p-1"
+                      title="Delete comment"
+                    >
+                      <FaTrash />
+                    </button>
+                  )}
+                </div>
+                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                  {comment.content}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -1,3 +1,23 @@
+import auth from './auth';
+import safeGuard from './SafeGuard';
+import diagnostics from './diagnostics';
+
+export {
+  auth,
+  safeGuard,
+  diagnostics
+};
+
+export * from './auth';
+export * from './diagnostics';
+
+// Default export for backward compatibility
+export default {
+  auth,
+  safeGuard,
+  diagnostics
+};
+
 export * from './storage';
 export * from './authToken';
 export * from './bannedUserManager';

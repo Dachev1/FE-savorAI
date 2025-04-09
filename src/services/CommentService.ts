@@ -1,50 +1,46 @@
-import api from '../api/apiService';
+import axios from '../api/axiosConfig';
 
-export interface Comment {
-  id: string;
-  content: string;
-  userId: string;
-  username: string;
+export interface CommentData {
+  id?: string;
   recipeId: string;
-  createdAt: string;
-  updatedAt: string;
-  isOwner: boolean;
-}
-
-export interface CommentRequest {
   content: string;
+  userId?: string;
+  username?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export interface CommentResponse {
-  content: Comment[];
-  totalPages: number;
-  totalElements: number;
-  size: number;
-  number: number;
-}
-
-class CommentService {
+/**
+ * Service for managing recipe comments
+ */
+const CommentService = {
   /**
    * Get all comments for a recipe
+   * @param recipeId The recipe ID to get comments for
    */
-  async getComments(recipeId: string, page = 0, size = 10): Promise<CommentResponse> {
+  getComments: async (recipeId: string): Promise<CommentData[]> => {
     try {
-      const response = await api.get(`/api/v1/recipes/${recipeId}/comments`, {
-        params: { page, size }
-      });
+      if (!recipeId) throw new Error('Recipe ID is required');
+      const response = await axios.get(`/v1/comments/${recipeId}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching comments:', error);
       throw error;
     }
-  }
+  },
 
   /**
-   * Add a comment to a recipe
+   * Add a new comment to a recipe
+   * @param recipeId Recipe ID to comment on
+   * @param content Comment content
    */
-  async addComment(recipeId: string, content: string): Promise<Comment> {
+  addComment: async (recipeId: string, content: string): Promise<CommentData> => {
     try {
-      const response = await api.post(`/api/v1/recipes/${recipeId}/comments`, {
+      if (!content) throw new Error('Comment content is required');
+      if (!recipeId) throw new Error('Recipe ID is required');
+      
+      const response = await axios.post('/v1/comments', {
+        recipeId,
         content
       });
       return response.data;
@@ -52,34 +48,56 @@ class CommentService {
       console.error('Error adding comment:', error);
       throw error;
     }
-  }
+  },
 
   /**
-   * Update a comment
+   * Update an existing comment
+   * @param commentId Comment ID to update
+   * @param content New comment content
    */
-  async updateComment(recipeId: string, commentId: string, content: string): Promise<Comment> {
+  updateComment: async (commentId: string, content: string): Promise<CommentData> => {
     try {
-      const response = await api.put(`/api/v1/recipes/${recipeId}/comments/${commentId}`, {
-        content
-      });
+      if (!commentId) throw new Error('Comment ID is required');
+      if (!content) throw new Error('Comment content is required');
+      
+      const response = await axios.put(`/v1/comments/${commentId}`, { content });
       return response.data;
     } catch (error) {
       console.error('Error updating comment:', error);
       throw error;
     }
-  }
+  },
 
   /**
    * Delete a comment
+   * @param commentId Comment ID to delete
    */
-  async deleteComment(recipeId: string, commentId: string): Promise<void> {
+  deleteComment: async (commentId: string): Promise<void> => {
     try {
-      await api.delete(`/api/v1/recipes/${recipeId}/comments/${commentId}`);
+      if (!commentId) throw new Error('Comment ID is required');
+      
+      await axios.delete(`/v1/comments/${commentId}`);
     } catch (error) {
       console.error('Error deleting comment:', error);
       throw error;
     }
+  },
+  
+  /**
+   * Get comment count for a recipe
+   * @param recipeId The recipe ID to get comment count for
+   */
+  getCommentCount: async (recipeId: string): Promise<number> => {
+    try {
+      if (!recipeId) return 0;
+      
+      const response = await axios.get(`/v1/comments/${recipeId}/count`);
+      return response.data.count || 0;
+    } catch (error) {
+      console.error('Error getting comment count:', error);
+      return 0;
+    }
   }
-}
+};
 
-export default new CommentService(); 
+export default CommentService; 

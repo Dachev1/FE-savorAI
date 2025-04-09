@@ -1,10 +1,9 @@
 import React, { useState, useCallback, memo, useMemo, useRef, useLayoutEffect, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth, useToast } from '../../context';
 import { Card, LoadingOverlay } from '../../components/common';
 import { FiMail, FiLock, FiEye, FiEyeOff } from 'react-icons/fi';
-import { useToast } from '../../context/ToastContext';
-import api from '../../api/apiService';
+import { authApi } from '../../api/apiService';
 
 interface FormState {
   identifier: string;
@@ -230,11 +229,11 @@ const SignIn = memo(() => {
       setLoading(true);
       
       // First check if the user is banned
-      const checkBanResponse = await api.get(`/api/v1/auth/check-status?identifier=${encodeURIComponent(formState.identifier)}`);
+      const checkBanResponse = await authApi.get(`/api/v1/auth/check-status?identifier=${encodeURIComponent(formState.identifier)}`);
       
       if (checkBanResponse.data?.banned) {
         // User is banned, show the banned message and prevent sign-in
-        setServerError('Your account has been banned by an administrator. Please contact support for assistance.');
+        setServerError('Your account has been banned by an admin. Please contact support for assistance.');
         showToast('Account banned: Access restricted', 'error', 10000);
         sessionStorage.setItem('account_banned', 'true');
         
@@ -275,7 +274,7 @@ const SignIn = memo(() => {
         if (isBanned) {
           // Create a more prominent ban notification that persists
           setServerError(`
-            Your account has been banned by an administrator. 
+            Your account has been banned by an admin. 
             If you believe this is an error, please contact support with your account details.
             All access to your account is restricted until this issue is resolved.
           `);
@@ -370,7 +369,7 @@ const SignIn = memo(() => {
                         Account Banned
                       </h1>
                       <p className="text-base mb-4">
-                        Your account has been banned by an administrator. 
+                        Your account has been banned by an admin. 
                         All access to your account is restricted until this issue is resolved.
                       </p>
                       <div className="mb-6">

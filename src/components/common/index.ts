@@ -9,8 +9,9 @@ export { default as MacrosDisplay } from './MacrosDisplay';
 export { default as PageTransition } from './PageTransition';
 export { default as Toast, ToastContainer } from './Toast';
 export { default as LoadingOverlay } from './LoadingOverlay';
-export { default as Avatar } from './Avatar';
 export { default as TabContainer } from './TabContainer';
 export { default as ProfileCard } from './ProfileCard';
+export { default as ResponsiveImage } from './ResponsiveImage';
+export { default as AnimatedTransition } from './AnimatedTransition';
 
 // Export other common components that might exist in the codebase 

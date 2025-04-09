@@ -82,7 +82,9 @@ const AdminDashboard: React.FC = () => {
       
       // Verify admin status
       if (!isAdmin) {
-        throw new Error('You do not have administrator privileges');
+        // Not an admin, exit immediately
+        console.error('User does not have admin privileges');
+        throw new Error('You do not have admin privileges');
       }
       
       return true;
@@ -235,13 +237,13 @@ const AdminDashboard: React.FC = () => {
         
         // If not admin, redirect and don't fetch users
         if (!isAdmin) {
-          showToast('Access denied. You do not have administrator privileges.', 'error');
+          showToast('Access denied. You do not have admin privileges.', 'error');
           navigate('/');
           return;
         }
       } else if (!isAdmin) {
         // If we've verified before but no longer admin
-        showToast('Access denied. You do not have administrator privileges.', 'error');
+        showToast('Access denied. You do not have admin privileges.', 'error');
         navigate('/');
         return;
       }
@@ -295,8 +297,7 @@ const AdminDashboard: React.FC = () => {
       // Show confirmation dialog for role changes
       const currentRole = targetUser.role;
       const isRoleDowngrade = 
-        (currentRole === 'ADMIN' && selectedRole !== 'ADMIN') || 
-        (currentRole === 'MODERATOR' && selectedRole === 'USER');
+        (currentRole === 'ADMIN' && selectedRole !== 'ADMIN');
         
       const roleChangeMessage = isRoleDowngrade 
         ? `Are you sure you want to downgrade user "${targetUser.username}" from ${currentRole} to ${selectedRole}?`
@@ -492,17 +493,9 @@ const AdminDashboard: React.FC = () => {
       let roleBadge;
       switch(user.role?.toLowerCase()) {
         case 'admin':
-        case 'administrator':
           roleBadge = (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
               Admin
-            </span>
-          );
-          break;
-        case 'moderator':
-          roleBadge = (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-              Moderator
             </span>
           );
           break;
@@ -563,7 +556,6 @@ const AdminDashboard: React.FC = () => {
                   disabled={isProcessing}
                 >
                   <option value="USER">User</option>
-                  <option value="MODERATOR">Moderator</option>
                   <option value="ADMIN">Admin</option>
                 </select>
                 <div className="flex space-x-1">

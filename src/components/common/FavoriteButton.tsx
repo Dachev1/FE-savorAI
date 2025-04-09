@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import { useNavigate, useLocation } from 'react-router-dom';
-import favoriteService from '../../services/favoriteService';
-import { useAuth } from '../../hooks/useAuth'; // Adjust to your auth hook
+import { favoriteService } from '../../services/favoriteService';
+import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 
 interface FavoriteButtonProps {
   recipeId: string;
@@ -21,8 +22,16 @@ const FavoriteButton: React.FC<FavoriteButtonProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isChecked, setIsChecked] = useState(!!initialState);
   const { isAuthenticated } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Update state when initialState prop changes
+  useEffect(() => {
+    if (initialState !== undefined) {
+      setIsFavorite(initialState);
+    }
+  }, [initialState]);
 
   useEffect(() => {
     if (!isChecked && isAuthenticated) {
@@ -52,11 +61,29 @@ const FavoriteButton: React.FC<FavoriteButtonProps> = ({
     if (isLoading) return;
     
     setIsLoading(true);
+    
+    // Update UI optimistically
+    const newStatus = !isFavorite;
+    setIsFavorite(newStatus);
+    
     try {
-      const newStatus = await favoriteService.toggleFavorite(recipeId);
-      setIsFavorite(newStatus);
+      // Call API to update server state
+      const result = await favoriteService.toggleFavorite(recipeId);
+      
+      // Force update state to match server result
+      setIsFavorite(result);
+      
+      // Show toast notification
+      if (result) {
+        showToast('Recipe added to favorites!', 'favorite');
+      } else {
+        showToast('Recipe removed from favorites', 'success');
+      }
     } catch (error) {
       console.error('Failed to toggle favorite:', error);
+      // Revert optimistic update if the API call fails
+      setIsFavorite(!newStatus);
+      showToast('Failed to update favorites', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -78,7 +105,9 @@ const FavoriteButton: React.FC<FavoriteButtonProps> = ({
           {isFavorite ? <FaHeart /> : <FaRegHeart />}
         </div>
       ) : (
-        isFavorite ? <FaHeart /> : <FaRegHeart />
+        isFavorite ? 
+          <FaHeart className="text-red-500 animate-heartbeat" style={{animation: isFavorite ? 'heartbeat 0.6s ease-in-out' : 'none'}} /> : 
+          <FaRegHeart className="transition-colors duration-300" />
       )}
       
       {showText && <span>{isFavorite ? 'Saved' : 'Add to Favorites'}</span>}

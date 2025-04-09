@@ -1,59 +1,45 @@
-import React, { useEffect } from 'react';
-import Navbar from './Navbar';
-import Footer from './Footer';
-import { useDarkMode } from '../../context/DarkModeContext';
+import React, { useEffect, ReactNode } from 'react';
+import { Outlet } from 'react-router-dom';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 
+import { useDarkMode } from '../../context';
+import Navbar from './Navbar';
+import Footer from './Footer';
+import { useConnectionQuality } from '../../hooks';
+
+/**
+ * Main layout component that wraps the entire application
+ */
 interface LayoutProps {
-  children: React.ReactNode;
+  children?: ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { isDarkMode } = useDarkMode();
+  const { isLowBandwidth } = useConnectionQuality();
 
   useEffect(() => {
     AOS.init({
-      duration: 1000,
-      once: true,
-      mirror: false,
+      duration: isLowBandwidth ? 400 : 800,
+      easing: 'ease-out',
+      once: isLowBandwidth,
+      disable: window.innerWidth < 768 && isLowBandwidth,
     });
-    
-    // Handle route changes to prevent unmounting issues
-    const handleRouteChange = () => {
-      // Ensure any AOS animations are completed
-      AOS.refresh();
-    };
-    
-    // Listen for route changes
-    window.addEventListener('popstate', handleRouteChange);
-    
-    return () => {
-      window.removeEventListener('popstate', handleRouteChange);
-      // Clean up any animations
-      AOS.refresh();
-    };
-  }, []);
+  }, [isLowBandwidth]);
 
-  // Apply theme to document body
   useEffect(() => {
-    // Remove any existing theme classes
-    document.body.classList.remove('light-theme', 'dark-theme');
-    
-    // Add current theme class
-    document.body.classList.add(isDarkMode ? 'dark-theme' : 'light-theme');
-    
-    // Add dark class to html for Tailwind
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    setTimeout(() => {
+      AOS.refresh();
+    }, 200);
   }, [isDarkMode]);
 
   return (
-    <div className={`min-h-screen flex flex-col w-full overflow-x-hidden ${isDarkMode ? 'dark bg-gray-900 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
-      {/* Background gradients */}
+    <div 
+      className={`flex flex-col min-h-screen transition-colors duration-500 ${
+        isDarkMode ? 'dark bg-gray-900 text-white' : 'bg-white text-gray-800'
+      }`}
+    >
       <div 
         className="fixed inset-0 transition-opacity duration-700 pointer-events-none opacity-20 dark:opacity-10" 
         aria-hidden="true"
@@ -66,13 +52,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         />
       </div>
 
-      {/* Main content */}
-      <header className="sticky top-0 z-50">
+      <header className="relative z-40">
         <Navbar />
       </header>
       
       <main className="flex-grow w-full overflow-x-hidden transition-colors duration-300">
-        {children}
+        {children || <Outlet />}
       </main>
 
       <Footer />

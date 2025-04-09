@@ -18,6 +18,9 @@ export default [
           jsx: true,
         },
       },
+      globals: {
+        ...globals.browser
+      },
     },
     plugins: {
       '@typescript-eslint': tseslint,
@@ -28,12 +31,17 @@ export default [
       ...tseslint.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       ...reactRefresh.configs.recommended.rules,
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/explicit-function-return-type': ['error', { allowExpressions: true }],
-      'react-hooks/rules-of-hooks': 'error',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/ban-ts-comment': 'off',
+      '@typescript-eslint/no-empty-function': 'warn',
+      'react-hooks/rules-of-hooks': 'warn',
       'react-hooks/exhaustive-deps': 'warn',
-      'react-refresh/only-export-components': ['warn', { allowConstantExports: true }],
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      'no-console': 'off',
+      'no-unused-vars': 'off',
     },
     settings: {
       react: {

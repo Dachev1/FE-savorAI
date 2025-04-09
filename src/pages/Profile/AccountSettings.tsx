@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useCallback, ChangeEvent, FormEvent } from 'react';
-import { FiUser, FiEdit3, FiLock } from 'react-icons/fi';
-import { useAuth } from '../../context/AuthContext';
-import { useToast } from '../../context/ToastContext';
-import api from '../../api/apiService';
+import React, { useState, useEffect, useCallback, ChangeEvent, FormEvent, useMemo } from 'react';
+import { FiUser, FiEdit3 } from 'react-icons/fi';
+import { useAuth, useToast } from '../../context';
 import { AnimatePresence } from 'framer-motion';
 import { ProfileCard, TabContainer } from '../../components/common';
 
@@ -24,34 +22,35 @@ interface ErrorState {
   password: string;
 }
 
+type TabType = 'profile' | 'username';
+
+const TABS: Array<{id: TabType, label: string, icon: React.ReactNode}> = [
+  { id: 'profile', label: 'Profile', icon: <FiUser size={22} /> },
+  { id: 'username', label: 'Change Username', icon: <FiEdit3 size={22} /> }
+];
+
 const AccountSettings: React.FC = () => {
-  // Tabs: 'profile', 'username', 'password'
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState<TabType>('profile');
   
-  // Get authentication context
-  const { user, updateUsername, isLoading } = useAuth();
+  const { user, updateUsername, isLoading, fetchUserProfile } = useAuth();
   const toastContext = useToast();
   
-  // Helper function for showing toasts
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', duration?: number) => {
     if (toastContext) {
       toastContext.showToast(message, type, duration);
     }
   }, [toastContext]);
   
-  // Profile info state
   const [profile, setProfile] = useState<ProfileFormState>({
     username: '',
     email: ''
   });
   
-  // Username change form state
   const [usernameForm, setUsernameForm] = useState<UsernameFormState>({
     newUsername: '',
     password: ''
   });
   
-  // Error state
   const [errors, setErrors] = useState<ErrorState>({
     newUsername: '',
     password: ''
@@ -67,37 +66,26 @@ const AccountSettings: React.FC = () => {
     }
   }, [user]);
   
-  // Tab change handler
-  const handleTabChange = (tab: string) => {
-    // Reset errors when changing tabs
-    setErrors({
-      newUsername: '',
-      password: ''
-    });
+  const resetForms = useCallback(() => {
+    setUsernameForm({ newUsername: '', password: '' });
+    setErrors({ newUsername: '', password: '' });
+  }, []);
+  
+  const handleTabChange = useCallback((tab: TabType) => {
+    resetForms();
     setActiveTab(tab);
-  };
+  }, [resetForms]);
   
-  // Username form change handler
-  const handleUsernameFormChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleUsernameFormChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
-    setUsernameForm(prev => ({
-      ...prev,
-      [id]: value
-    }));
-    
-    // Clear error when field is modified
+    setUsernameForm(prev => ({ ...prev, [id]: value }));
     setErrors(prev => ({ ...prev, [id]: '' }));
-  };
+  }, []);
   
-  // Validate username form
-  const validateUsernameForm = (): boolean => {
+  const validateUsernameForm = useCallback((): boolean => {
     let isValid = true;
-    const newErrors: ErrorState = {
-      newUsername: '',
-      password: ''
-    };
+    const newErrors: ErrorState = { newUsername: '', password: '' };
     
-    // Validate new username
     if (!usernameForm.newUsername) {
       newErrors.newUsername = 'Username is required';
       isValid = false;
@@ -109,7 +97,6 @@ const AccountSettings: React.FC = () => {
       isValid = false;
     }
     
-    // Validate password
     if (!usernameForm.password) {
       newErrors.password = 'Password is required to confirm changes';
       isValid = false;
@@ -117,83 +104,60 @@ const AccountSettings: React.FC = () => {
     
     setErrors(newErrors);
     return isValid;
-  };
+  }, [usernameForm, profile.username]);
   
-  // Handle username change form submission
   const handleUsernameSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    // Validate form
-    if (!validateUsernameForm()) {
-      return;
-    }
+    if (!validateUsernameForm()) return;
     
-    // Call API to update username
     const result = await updateUsername(usernameForm.password, usernameForm.newUsername);
     
     if (result.success) {
-      // Show success message
       showToast(result.message || 'Username updated successfully', 'success');
-      
-      // Reset form
-      setUsernameForm({
-        newUsername: '',
-        password: ''
-      });
-      
-      // Switch back to profile tab
+      resetForms();
       setActiveTab('profile');
     } else {
-      // Show error message
       showToast(result.error || 'Failed to update username', 'error');
       
-      // Set error if it's related to password
       if (result.error?.toLowerCase().includes('password')) {
-        setErrors(prev => ({
-          ...prev,
-          password: result.error || 'Invalid password'
-        }));
+        setErrors(prev => ({ ...prev, password: result.error || 'Invalid password' }));
       }
     }
   };
   
-  // Button style classes
-  const buttonClass = "w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 items-center";
+  // Memoized UI components
+  const buttonClass = useMemo(() => "w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 items-center", []);
+  
+  const inputClass = useCallback((error: string) => `appearance-none block w-full px-3 py-2 border ${
+    error ? 'border-red-300' : 'border-gray-300 dark:border-gray-600'
+  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white`, []);
   
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Account Settings</h1>
       
-      {/* Tabs */}
       <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
-        <button
-          onClick={() => handleTabChange('profile')}
-          className={`mr-4 py-2 px-1 ${
-            activeTab === 'profile'
-              ? 'border-b-2 border-blue-500 dark:border-blue-400 text-blue-600 dark:text-blue-400'
-              : 'text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100'
-          }`}
-        >
-          Profile
-        </button>
-        <button
-          onClick={() => handleTabChange('username')}
-          className={`mr-4 py-2 px-1 ${
-            activeTab === 'username'
-              ? 'border-b-2 border-blue-500 dark:border-blue-400 text-blue-600 dark:text-blue-400'
-              : 'text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100'
-          }`}
-        >
-          Change Username
-        </button>
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => handleTabChange(tab.id)}
+            className={`mr-4 py-2 px-1 ${
+              activeTab === tab.id
+                ? 'border-b-2 border-blue-500 dark:border-blue-400 text-blue-600 dark:text-blue-400'
+                : 'text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
       
       <AnimatePresence mode="wait">
-        {/* Profile Information Tab */}
         {activeTab === 'profile' && (
           <TabContainer title="Profile Information" icon={<FiUser size={22} />}>
             <div className="space-y-6">
-              <div className="grid gap-5 md:grid-cols-2">
+              <div className="grid gap-5 md:grid-cols-2 flex-grow">
                 <ProfileCard label="Username" value={profile.username} />
                 <ProfileCard label="Email" value={profile.email} />
               </div>
@@ -206,7 +170,6 @@ const AccountSettings: React.FC = () => {
           </TabContainer>
         )}
         
-        {/* Change Username Tab */}
         {activeTab === 'username' && (
           <TabContainer title="Change Username" icon={<FiEdit3 size={22} />}>
             <form onSubmit={handleUsernameSubmit} className="space-y-6">
@@ -223,9 +186,7 @@ const AccountSettings: React.FC = () => {
                     required
                     value={usernameForm.newUsername}
                     onChange={handleUsernameFormChange}
-                    className={`appearance-none block w-full px-3 py-2 border ${
-                      errors.newUsername ? 'border-red-300' : 'border-gray-300 dark:border-gray-600'
-                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white`}
+                    className={inputClass(errors.newUsername)}
                   />
                   {errors.newUsername && (
                     <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.newUsername}</p>
@@ -246,9 +207,7 @@ const AccountSettings: React.FC = () => {
                     required
                     value={usernameForm.password}
                     onChange={handleUsernameFormChange}
-                    className={`appearance-none block w-full px-3 py-2 border ${
-                      errors.password ? 'border-red-300' : 'border-gray-300 dark:border-gray-600'
-                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white`}
+                    className={inputClass(errors.password)}
                   />
                   {errors.password && (
                     <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.password}</p>
@@ -262,14 +221,7 @@ const AccountSettings: React.FC = () => {
                   disabled={isLoading}
                   className={buttonClass}
                 >
-                  {isLoading ? (
-                    <>
-                      <div className="w-5 h-5 border-t-2 border-b-2 border-white rounded-full animate-spin mr-3"></div>
-                      Updating...
-                    </>
-                  ) : (
-                    "Update Username"
-                  )}
+                  {isLoading ? 'Updating...' : 'Update Username'}
                 </button>
               </div>
             </form>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 import { FaGithub, FaLinkedinIn, FaEnvelope } from 'react-icons/fa';
+import { ResponsiveImage } from '../../components/common';
 
 const About: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -101,11 +102,14 @@ const AboutSection: React.FC<AboutSectionProps> = memo(({ imageLoaded, onImageLo
         <div className="relative">
           <div className="absolute -z-10 inset-0 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-3xl transform -rotate-3"></div>
           <div className={`rounded-3xl shadow-xl w-full aspect-[3/4] relative z-10 overflow-hidden ${!imageLoaded ? 'bg-gray-200 dark:bg-gray-700 animate-pulse' : ''}`}>
-            <img
+            <ResponsiveImage
               src="/assets/me-photo.jpg"
               alt="Ivan Dachev, creator of SavorAI"
-              className={`w-full h-full object-cover transform hover:scale-105 transition-transform duration-500 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+              className="w-full h-full"
+              aspectRatio="3/4"
+              loadingStrategy="eager"
               onLoad={onImageLoad}
+              placeholderColor="#f5f5f7"
             />
           </div>
           <div

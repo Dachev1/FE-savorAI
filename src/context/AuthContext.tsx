@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useNavigate } from 'react-router-dom';
 import { useToast } from './ToastContext';
 import { ToastType } from '../components/common/Toast';
-import api from '../api/apiService';
+import api, { authApi } from '../api/apiService';
 import auth from '../utils/auth';
 import { ROUTES } from '../routes';
 
@@ -12,9 +12,6 @@ interface User {
   username: string;
   email: string;
   role?: string;
-  firstName?: string;
-  lastName?: string;
-  bio?: string;
   createdAt?: string;
   updatedAt?: string;
   banned?: boolean;
@@ -77,9 +74,10 @@ interface AuthContextInterface {
     message?: string;
     error?: string;
   }>;
+  fetchUserProfile: () => Promise<boolean>;
 }
 
-// Create the context with default values
+// Create context with default values
 const AuthContext = createContext<AuthContextInterface>({
   isAuthenticated: false,
   user: null,
@@ -91,16 +89,32 @@ const AuthContext = createContext<AuthContextInterface>({
   refreshUserData: async () => false,
   updateUsername: async () => ({ success: false, error: 'AuthContext not initialized' }),
   checkAuth: async () => false,
+  fetchUserProfile: async () => false,
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Only log if not suppressed
-  if (!window.localStorage.getItem('suppress_logs')) {
-    // Comment the line below to disable logs
-    // console.log('AuthProvider rendering');
-  }
   const navigate = useNavigate();
   const toastContext = useToast();
+  
+  // State & Refs
+  const [user, setUser] = useState<User | null>(() => auth.getUser<User>());
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  
+  const logoutRef = useRef<() => Promise<void>>();
+  const refreshInProgressRef = useRef<boolean>(false);
+  const lastRefreshTimeRef = useRef<number>(0);
+  const REFRESH_COOLDOWN = 5000;
+  const banCheckIntervalRef = useRef<number | null>(null);
+  
+  // Computed properties
+  const isAuthenticated = useMemo(() => !!user && !!user.id, [user]);
+  const isAdmin = useMemo(() => {
+    if (!isAuthenticated || !user) return false;
+    const authRole = auth.getRole();
+    const userRole = user.role?.toLowerCase() || '';
+    return (authRole && ['admin'].includes(authRole.toLowerCase())) || 
+           ['admin'].includes(userRole);
+  }, [isAuthenticated, user]);
   
   // Toast utility
   const showToast = useCallback((message: string, type: ToastType = 'info', duration?: number) => {
@@ -110,32 +124,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Toast context is not available, message:', message);
     }
   }, [toastContext]);
-  
-  // State
-  const [user, setUser] = useState<User | null>(() => auth.getUser<User>());
-  
-  // Function references to avoid circular dependencies
-  const logoutRef = useRef<() => Promise<void>>();
-  
-  // Request tracking
-  const refreshInProgressRef = useRef<boolean>(false);
-  const lastRefreshTimeRef = useRef<number>(0);
-  const REFRESH_COOLDOWN = 3000; // 3 seconds between refreshes
-  
-  // Polling reference for background checks
-  const banCheckIntervalRef = useRef<number | null>(null);
-  
-  // Computed properties
-  const isAuthenticated = useMemo(() => !!user && !!user.id, [user]);
-  const isAdmin = useMemo(() => {
-    if (!isAuthenticated || !user) return false;
-    const authRole = auth.getRole();
-    const userRole = user.role?.toLowerCase() || '';
-    const isAdminRole = 
-      (authRole && ['admin', 'administrator'].includes(authRole.toLowerCase())) || 
-      ['admin', 'administrator'].includes(userRole);
-    return !!isAdminRole;
-  }, [isAuthenticated, user]);
   
   // Update user state
   const updateUserState = useCallback((userData: User | null) => {
@@ -147,50 +135,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(userData);
   }, []);
 
-  // Enhanced handle user banning with cache clearing
+  // Handle user banning
   const handleUserBanned = useCallback(() => {
-    console.warn('User has been banned, clearing auth state');
-    
-    // Clear all caches
     sessionStorage.clear();
-    
-    // Clear auth state
     auth.clearAuth();
     
-    // Clear any localStorage cache related to user
     Object.keys(localStorage).forEach(key => {
       if (key.includes('user') || key.includes('admin') || key.includes('auth')) {
         localStorage.removeItem(key);
       }
     });
     
-    // Update UI
     updateUserState(null);
-    
-    // Show toast notification
     showToast('Your account has been banned.', 'error', 5000);
-    
-    // Navigate to sign-in
     navigate(ROUTES.SIGN_IN);
   }, [showToast, updateUserState, navigate]);
 
   // Background polling for ban status
   useEffect(() => {
-    // Only check if authenticated
     if (!isAuthenticated || !user?.id) return;
     
-    // Start polling for ban status if user is authenticated
     const checkBanStatus = async () => {
       try {
-        // Check if token already indicates banned
         if (auth.isUserBanned()) {
           handleUserBanned();
           return;
         }
         
-        // Check with server - add timestamp to prevent duplicate request errors
+        const now = Date.now();
+        const fiveMinutes = 5 * 60 * 1000;
+        if (now - lastRefreshTimeRef.current < fiveMinutes) {
+          return;
+        }
+        
         const timestamp = Date.now();
-        const response = await api.get<{ banned: boolean }>(
+        const response = await authApi.get<{ banned: boolean }>(
           `/api/v1/auth/check-status?identifier=${encodeURIComponent(user.username || user.email)}&_t=${timestamp}`
         );
         
@@ -198,97 +177,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           handleUserBanned();
         }
       } catch (error: any) {
-        // Ignore cancellation errors to prevent console spam
         if (error?.isCancel || error?.isCancelled || error?.code === 'ERR_CANCELED') {
-          return; // Silently ignore canceled requests
+          return;
         }
-        console.error('Error checking ban status:', error);
       }
     };
     
-    // Initial check
-    checkBanStatus();
-    
-    // Setup polling every 5 minutes (300000ms)
-    const intervalId = window.setInterval(checkBanStatus, 300000);
+    const initialTimer = setTimeout(checkBanStatus, 3000);
+    const intervalId = window.setInterval(checkBanStatus, 600000);
     banCheckIntervalRef.current = intervalId as unknown as number;
     
     return () => {
+      clearTimeout(initialTimer);
       if (banCheckIntervalRef.current) {
         window.clearInterval(banCheckIntervalRef.current);
         banCheckIntervalRef.current = null;
       }
     };
-  }, [isAuthenticated, user, handleUserBanned]);
+  }, [isAuthenticated, user, handleUserBanned, lastRefreshTimeRef]);
 
-  // Route change handler for auth check
-  useEffect(() => {
-    const handleRouteChange = () => {
-      // Check ban status on route change for authenticated users
-      if (isAuthenticated && user) {
-        const checkBanStatus = async () => {
-          // First check local cache/token
-          if (auth.isUserBanned()) {
-            handleUserBanned();
-            return;
-          }
-          
-          // We don't need to make an API call on every route change 
-          // as the polling will handle periodic checks
-        };
-        
-        checkBanStatus();
-      }
-    };
-    
-    // Listen for route changes
-    window.addEventListener('popstate', handleRouteChange);
-    
-    return () => {
-      window.removeEventListener('popstate', handleRouteChange);
-    };
-  }, [isAuthenticated, user, handleUserBanned]);
-
-  // Refresh user data
+  // Enhanced refresh user data function with optimized throttling
   const refreshUserData = useCallback(async (): Promise<boolean> => {
+    if (refreshInProgressRef.current) {
+      return true;
+    }
+    
+    const now = Date.now();
+    if (now - lastRefreshTimeRef.current < REFRESH_COOLDOWN) {
+      return true;
+    }
+    
+    refreshInProgressRef.current = true;
+    lastRefreshTimeRef.current = now;
+    
     try {
       if (!auth.isTokenValid()) {
+        refreshInProgressRef.current = false;
         return false;
       }
       
-      // Throttle requests
-      const now = Date.now();
-      if (now - lastRefreshTimeRef.current < REFRESH_COOLDOWN) {
-        return true;
-      }
-      if (refreshInProgressRef.current) {
-        return true;
-      }
-      
-      refreshInProgressRef.current = true;
-      lastRefreshTimeRef.current = now;
-      
       try {
-        const response = await api.get<ProfileResponse>('/api/v1/user/profile');
+        const response = await authApi.get<ProfileResponse>('/api/v1/profile', {
+          headers: {
+            'Authorization': `Bearer ${auth.getToken()}`,
+            'Cache-Control': 'no-cache',
+          },
+          params: {
+            '_': Date.now()
+          }
+        });
+        
         const profileData = response.data;
         
         if (profileData?.id) {
-          // Store previous role to detect changes
           const previousRole = user?.role;
           
-          // Always update with latest server data
           updateUserState(profileData);
           
-          // Detect and handle role changes
           if (previousRole && profileData.role && previousRole !== profileData.role) {
-            console.log(`User role changed from ${previousRole} to ${profileData.role}`);
             showToast(`Your account role has been updated to ${profileData.role}`, 'info', 5000);
-            
-            // Notify about role change
             auth.notifyRoleChange(previousRole, profileData.role);
           }
           
-          // Check if user is now banned
           if (profileData.banned === true && user?.banned !== true) {
             handleUserBanned();
             return false;
@@ -299,20 +249,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         return false;
       } finally {
-        setTimeout(() => {
-          refreshInProgressRef.current = false;
-        }, 100);
+        refreshInProgressRef.current = false;
       }
     } catch (error) {
+      refreshInProgressRef.current = false;
       return false;
     }
   }, [updateUserState, user, showToast, handleUserBanned]);
   
-  // Enhanced fetchLatestUserData function with token refresh
+  // Fetch latest user data
   const fetchLatestUserData = useCallback(async (): Promise<User | null> => {
     try {
-      // Force token refresh before fetching profile
-      auth.forceTokenRefresh();
+      const cachedUserData = auth.getUser<User>();
+      const now = Date.now();
+      const fiveMinutes = 5 * 60 * 1000;
+      
+      if (cachedUserData && (now - lastRefreshTimeRef.current < fiveMinutes)) {
+        return cachedUserData;
+      }
       
       const token = auth.getToken();
       if (!token) return null;
@@ -322,96 +276,93 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        // Prevent caching
         params: {
-          '_': Date.now() // Add timestamp to prevent caching
+          '_': Date.now()
         }
       };
       
-      const response = await api.get<User>('/api/v1/user/profile', config);
+      const response = await authApi.get<User>('/api/v1/profile', config);
+      lastRefreshTimeRef.current = now;
+      
+      if (response.data) {
+        auth.setUser(response.data);
+      }
+      
       return response.data || null;
     } catch (error) {
-      console.error('Error fetching latest user data:', error);
       return null;
     }
   }, []);
 
-  // Enhanced checkAuth function to force server verification
+  // Enhanced checkAuth function with optimized server verification
   const checkAuth = useCallback(async (): Promise<boolean> => {
-    // Skip if already in progress or if we've refreshed recently
     if (refreshInProgressRef.current) {
       return isAuthenticated;
     }
     
-    // Check if the token is still valid
     if (!auth.isTokenValid()) {
       updateUserState(null);
       return false;
     }
     
-    // Check for cooldown to avoid excessive API calls
     const now = Date.now();
-    if (now - lastRefreshTimeRef.current < REFRESH_COOLDOWN) {
+    const ENHANCED_REFRESH_COOLDOWN = 60000;
+    if (now - lastRefreshTimeRef.current < ENHANCED_REFRESH_COOLDOWN) {
       return isAuthenticated;
     }
     
-    // Set refresh in progress flag
     refreshInProgressRef.current = true;
     
     try {
-      const response = await api.get<ProfileResponse>('/api/v1/auth/profile');
-      const userData = response.data;
+      const token = auth.getToken();
       
-      // Check if banned 
+      const response = await authApi.get<ProfileResponse>('/api/v1/profile', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache'
+        },
+        params: {
+          '_': Date.now()
+        }
+      });
+      
+      const userData = response.data;
+      lastRefreshTimeRef.current = now;
+      
       if (userData.banned === true) {
         handleUserBanned();
         refreshInProgressRef.current = false;
         return false;
       }
       
-      // Only update if we got valid data
       if (userData && userData.id) {
-        // Update state with latest user data
         updateUserState(userData);
-        lastRefreshTimeRef.current = now;
-        
-        // Dispatch auth-restored event if user was already authenticated
-        if (isAuthenticated) {
-          window.dispatchEvent(new CustomEvent('auth-state-changed', { 
-            detail: { 
-              action: 'auth-restored',
-              timestamp: Date.now(),
-              user: userData
-            }
-          }));
-        }
-        
         refreshInProgressRef.current = false;
         return true;
       }
       
-      // If we didn't get valid data, clear auth
       updateUserState(null);
       refreshInProgressRef.current = false;
       return false;
     } catch (error) {
-      console.error('Error refreshing auth:', error);
+      if ((error as any)?.response?.status === 401 || (error as any)?.response?.status === 403) {
+        updateUserState(null);
+        auth.clearAuth();
+      }
+      
       refreshInProgressRef.current = false;
-      return isAuthenticated; // Return current state on error
+      return isAuthenticated;
     }
   }, [isAuthenticated, updateUserState, handleUserBanned]);
-
-  // Enhanced useEffect to ensure auth state is frequently checked
+  
+  // Periodic auth verification
   useEffect(() => {
-    // Set up auth check interval to detect banned/role changes
-    // Check every 30 seconds when user is logged in
     const authCheckInterval = setInterval(async () => {
       if (user?.id && auth.isTokenValid()) {
         await checkAuth();
       }
-    }, 30000); // 30 seconds
+    }, 300000);
     
-    // Initial auth check
     if (!user?.id && auth.isTokenValid()) {
       checkAuth();
     }
@@ -421,36 +372,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [user, checkAuth]);
 
-  // Add useEffect to enforce immediate auth check on route changes
+  // Route change handler for auth check
   useEffect(() => {
-    // Listen for navigation events
     const handleRouteChange = () => {
-      // Force check auth on every route change if the user is logged in
-      if (user?.id && auth.isTokenValid()) {
-        checkAuth();
+      if (isAuthenticated && user) {
+        if (auth.isUserBanned()) {
+          handleUserBanned();
+          return;
+        }
+        
+        const now = Date.now();
+        const lastCheck = lastRefreshTimeRef.current;
+        
+        if (now - lastCheck > 60000) {
+          checkAuth();
+        }
       }
     };
     
-    // Add event listener for navigation
     window.addEventListener('popstate', handleRouteChange);
     
     return () => {
       window.removeEventListener('popstate', handleRouteChange);
     };
-  }, [user, checkAuth]);
+  }, [isAuthenticated, user, handleUserBanned, checkAuth, lastRefreshTimeRef]);
 
   // Handle logout
   const logout = useCallback(async (): Promise<void> => {
     try {
-      // Cancel any pending requests to avoid React errors
       api.cancelPendingRequests?.();
       
-      // First dispatch event to notify components to prepare for unmounting
       window.dispatchEvent(new CustomEvent('prepare-for-logout', { 
         detail: { timestamp: Date.now() }
       }));
       
-      // Add a visible indicator that logout is in progress
       const loaderEl = document.createElement('div');
       loaderEl.style.position = 'fixed';
       loaderEl.style.top = '0';
@@ -462,10 +417,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loaderEl.style.transition = 'width 0.5s ease-out';
       document.body.appendChild(loaderEl);
       
-      // Prevent any navigation during logout
       window.history.pushState(null, '', window.location.pathname);
       
-      // Prevent default behavior for all links during logout
       const preventClicks = (e: MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -474,7 +427,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       document.addEventListener('click', preventClicks, true);
       
-      // Small delay to allow components to prepare for unmounting
       await new Promise(resolve => setTimeout(resolve, 50));
       
       // Animate loader
@@ -568,7 +520,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Reset auth state for clean login
       auth.resetForLogin();
       
-      const response = await api.post<AuthResponse>('/api/v1/auth/signin', { identifier, password });
+      const response = await authApi.post<AuthResponse>('/api/v1/auth/signin', { identifier, password });
       const data = response.data;
       
       if (!data) return { success: false, error: 'Invalid response from server' };
@@ -594,7 +546,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Return detailed error
         return {
           success: false,
-          error: 'Your account has been banned by an administrator. Please contact support for assistance.',
+          error: 'Your account has been banned by an admin. Please contact support for assistance.',
           isBanned: true
         };
       }
@@ -667,7 +619,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     duplicateEmail?: string;
   }> => {
     try {
-      const response = await api.post<AuthResponse>('/api/v1/auth/signup', {
+      const response = await authApi.post<AuthResponse>('/api/v1/auth/signup', {
         username: formData.username,
         email: formData.email,
         password: formData.password
@@ -721,100 +673,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     message?: string;
     error?: string;
   }> => {
-    if (!isAuthenticated) {
-      return { success: false, error: 'You must be logged in to update your username' };
-    }
-    
     try {
-      console.log('Attempting to update username from', user?.username, 'to', newUsername);
+      // Validate password and new username are provided
+      if (!currentPassword || !newUsername) {
+        return {
+          success: false,
+          error: 'Password and new username are required'
+        };
+      }
       
-      // Create request payload for both endpoint formats
-      const oldFormatPayload = {
+      // Make API call to update username
+      const response = await authApi.post('/api/v1/user/update-username', {
         currentPassword,
         newUsername
-      };
+      });
       
-      const newFormatPayload = {
-        currentPassword,
-        username: newUsername
-      };
-
-      // Add authorization header explicitly
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${auth.getToken()}`,
-          'Content-Type': 'application/json'
-        }
-      };
-      
-      try {
-        // First try new endpoint
-        console.log('Trying new username update endpoint');
-        const response = await api.post<{success: boolean; message?: string}>(
-          '/api/v1/auth/change-username', 
-          newFormatPayload,
-          config
-        );
-        const data = response.data;
-        
-        if (data?.success) {
-          // Update local user data
-          if (user) {
-            updateUserState({ ...user, username: newUsername });
-          }
-          
-          showToast('Username updated successfully', 'success');
-          return { success: true, message: 'Username updated successfully' };
+      if (response.data?.success) {
+        // Update local user data
+        if (user) {
+          updateUserState({ ...user, username: newUsername });
         }
         
-        return { success: false, error: 'Failed to update username' };
-      } catch (primaryError: any) {
-        console.warn('First username endpoint failed, trying fallback:', primaryError);
-        
-        // Check for specific 403 error
-        if (primaryError?.response?.status === 403) {
-          const errorMsg = 'You do not have permission to change your username. Contact an administrator for assistance.';
-          showToast(errorMsg, 'error');
-          return { success: false, error: errorMsg };
-        }
-        
-        // If that fails, try old endpoint
-        try {
-          const response = await api.put<{success: boolean; message?: string}>(
-            '/api/v1/user/username', 
-            oldFormatPayload,
-            config
-          );
-          const data = response.data;
-          
-          if (data?.success) {
-            // Update local user data
-            if (user) {
-              updateUserState({ ...user, username: newUsername });
-            }
-            
-            showToast('Username updated successfully', 'success');
-            return { success: true, message: 'Username updated successfully' };
-          }
-          
-          return { success: false, error: 'Failed to update username' };
-        } catch (fallbackError: any) {
-          // Both endpoints failed
-          // Check for specific 403 error in fallback
-          if (fallbackError?.response?.status === 403) {
-            const errorMsg = 'You do not have permission to change your username. Contact an administrator for assistance.';
-            showToast(errorMsg, 'error');
-            return { success: false, error: errorMsg };
-          }
-          
-          console.error('Both username update endpoints failed:', fallbackError);
-          throw fallbackError;
-        }
+        showToast('Username updated successfully', 'success');
+        return { success: true, message: 'Username updated successfully' };
       }
+      
+      return { success: false, error: 'Failed to update username' };
     } catch (error: any) {
       console.error('Username update error:', error);
       const errorMsg = error.response?.status === 403 
-        ? 'Permission denied: You cannot change your username. Contact an administrator.'
+        ? 'Permission denied: You cannot change your username. Contact an admin.'
         : error.response?.data?.message || 'Failed to update username';
       
       showToast(errorMsg, 'error');
@@ -824,6 +712,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
   }, [isAuthenticated, user, updateUserState, showToast]);
+
+  // Fetch user profile data specifically
+  const fetchUserProfile = useCallback(async (): Promise<boolean> => {
+    if (!isAuthenticated) return false;
+    
+    try {
+      const token = auth.getToken();
+      
+      if (!token) {
+        console.warn('No token available for fetchUserProfile');
+        return false;
+      }
+      
+      const response = await api.get<ProfileResponse>('/api/v1/profile');
+      
+      if (response.data) {
+        // Update user data with latest username
+        const updatedUser = {
+          ...user,
+          username: response.data.username,
+        };
+        updateUserState(updatedUser as User);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      return false;
+    }
+  }, [isAuthenticated, user, updateUserState]);
 
   // Context value
   const contextValue = useMemo(() => ({
@@ -837,9 +756,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUserData,
     updateUsername,
     checkAuth,
+    fetchUserProfile,
   }), [
     isAuthenticated, user, isAdmin,
-    signin, signup, logout, refreshUserData, updateUsername, checkAuth,
+    signin, signup, logout, refreshUserData, updateUsername, checkAuth, fetchUserProfile,
   ]);
   
   try {

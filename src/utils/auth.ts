@@ -17,11 +17,18 @@ export interface TokenPayload {
 const AUTH_TOKEN_KEY = 'auth_token';
 const USER_DATA_KEY = 'user_data';
 
-// Cache for token validation
+// Cache for token validation with clear naming and purpose
 const tokenCache = {
+  // The cached token string
   token: '',
+  // Whether the token is still valid
   isValid: false,
-  timestamp: 0
+  // Last time the validation was performed (timestamp)
+  timestamp: 0,
+  // User data associated with token
+  userData: null,
+  // Last time we checked with server
+  lastServerCheck: 0
 };
 
 // Auth utilities
@@ -119,56 +126,71 @@ const auth = {
 
   /**
    * Check if token is valid
+   * This optimized function uses caching to reduce validation overhead
    */
   isTokenValid(): boolean {
     try {
       const token = this.getToken();
-      if (!token) return false;
       
-      // Check cache first
+      // No token → not valid
+      if (!token) {
+        console.debug('No auth token found');
+        return false;
+      }
+      
+      // Check cache first (valid for 30 seconds)
       const now = Date.now();
       if (tokenCache.token === token && (now - tokenCache.timestamp) < 30000) {
         return tokenCache.isValid;
       }
       
+      // Parse and validate the token
       try {
         const payload = this.parseToken(token);
+        
+        // Check if payload exists and has expiration
         if (!payload || !payload.exp) {
-          tokenCache.token = token;
-          tokenCache.isValid = false;
-          tokenCache.timestamp = now;
+          this.updateTokenCache(token, false, now);
+          console.debug('Token payload invalid or missing expiry');
           return false;
         }
         
-        // Check expiration with 30s buffer
+        // Check if token is expired (with 30s buffer)
         const expiryTime = payload.exp * 1000;
         const isValid = expiryTime > (now + 30000);
         
-        // Check for banned status in token
+        if (!isValid) {
+          console.debug(`Token expired: ${new Date(expiryTime)} is before ${new Date(now + 30000)}`);
+        }
+        
+        // Check for banned status
         if (payload.banned === true) {
           console.warn('User is banned according to token payload');
-          tokenCache.token = token;
-          tokenCache.isValid = false;
-          tokenCache.timestamp = now;
+          this.updateTokenCache(token, false, now);
           return false;
         }
         
-        // Update cache
-        tokenCache.token = token;
-        tokenCache.isValid = isValid;
-        tokenCache.timestamp = now;
-        
+        // Update cache and return result
+        this.updateTokenCache(token, isValid, now);
         return isValid;
-      } catch {
-        tokenCache.token = token;
-        tokenCache.isValid = false;
-        tokenCache.timestamp = now;
+      } catch (error) {
+        console.debug('Error parsing token:', error);
+        this.updateTokenCache(token, false, now);
         return false;
       }
     } catch (error) {
       console.error('Error validating token:', error);
       return false;
     }
+  },
+  
+  /**
+   * Helper method to update token cache consistently
+   */
+  private updateTokenCache(token: string, isValid: boolean, timestamp: number): void {
+    tokenCache.token = token;
+    tokenCache.isValid = isValid;
+    tokenCache.timestamp = timestamp;
   },
 
   /**
@@ -205,7 +227,7 @@ const auth = {
    */
   isAdmin(): boolean {
     const role = this.getRole();
-    return !!role && ['admin', 'administrator'].includes(role.toLowerCase());
+    return !!role && ['admin'].includes(role.toLowerCase());
   },
   
   /**
@@ -237,10 +259,19 @@ const auth = {
    * Used when admin operations need to ensure fresh validation
    */
   forceTokenRefresh(): void {
+    // Check if we've already refreshed recently (within 1 minute)
+    const now = Date.now();
+    const oneMinute = 60 * 1000;
+    
+    if (tokenCache.token && (now - tokenCache.timestamp < oneMinute)) {
+      console.debug('Skipping forced token refresh - already refreshed recently');
+      return;
+    }
+    
+    console.log('Token validation state forcefully refreshed');
     tokenCache.token = '';
     tokenCache.isValid = false;
-    tokenCache.timestamp = 0;
-    console.log('Token validation state forcefully refreshed');
+    tokenCache.timestamp = now;
   }
 };
 

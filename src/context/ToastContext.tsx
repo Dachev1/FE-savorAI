@@ -33,25 +33,36 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   // Array of active toasts
   const [toasts, setToasts] = useState<Toast[]>([]);
   
+  // Use a ref to track active toasts to avoid dependency on toasts in the callback
+  const toastsRef = useRef<Toast[]>([]);
+  
   // Use a ref to track toast timestamps to prevent duplicates during rapid refreshes
   const toastTimestamps = useRef<Record<string, number>>({});
   // Minimum time between identical toasts in milliseconds
   const TOAST_THROTTLE_TIME = 2000;
   
+  // Update ref when state changes
+  useEffect(() => {
+    toastsRef.current = toasts;
+  }, [toasts]);
+  
   // Show toast with duplicate prevention
   const showToast = useCallback((
     message: string, 
     type: ToastType = 'info', 
-    duration = 5000,
+    duration?: number,
   ) => {
     // Skip empty messages
     if (!message?.trim()) return;
+    
+    // Ensure duration is valid (default to 5000ms if invalid or undefined)
+    const validDuration = (!duration || duration <= 0) ? 5000 : duration;
     
     // Create a unique key for this toast
     const toastKey = `${type}:${message}`;
     
     // Check if this exact message is already showing
-    if (toasts.some(toast => `${toast.type}:${toast.message}` === toastKey)) {
+    if (toastsRef.current.some(toast => `${toast.type}:${toast.message}` === toastKey)) {
       return;
     }
     
@@ -72,12 +83,12 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       id: uuidv4(),
       message,
       type,
-      duration
+      duration: validDuration
     };
     
     // Add toast to the array
     setToasts(prev => [newToast, ...prev]);
-  }, [toasts]);
+  }, []); // Removed toasts dependency
   
   // Remove toast by ID
   const removeToast = useCallback((id: string) => {
@@ -125,7 +136,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       window.removeEventListener('network-error', handleNetworkError);
       window.removeEventListener('server-error', handleServerError);
     };
-  }, []);
+  }, [showToast]);
   
   // Listen for toast message events
   useEffect(() => {

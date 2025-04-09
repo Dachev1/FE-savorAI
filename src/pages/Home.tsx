@@ -2,8 +2,7 @@ import React, { useEffect, memo, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
-import { useAuth } from '../context/AuthContext';
-import { useDarkMode } from '../context/DarkModeContext';
+import { useAuth, useDarkMode } from '../context';
 import { FiZap, FiPlusCircle, FiBookOpen } from 'react-icons/fi';
 import { FaRobot, FaHeart, FaUsers, FaClock, FaLeaf, FaUtensils, FaStar } from 'react-icons/fa';
 

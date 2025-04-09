@@ -9,7 +9,7 @@ import { CreateIngredientsInput } from '../../components/common/Input/CreateIngr
 import MacrosInput from '../../components/common/Input/MacrosInput';
 import { IFormErrors, IMacros, IRecipeFormData } from '../../types/recipeForm';
 import RecipePreview from './RecipePreview';
-import { FaArrowLeft, FaEdit, FaUtensils, FaChartBar, FaEye, FaLeaf, FaListUl, FaInfoCircle, FaRegLightbulb, FaExclamationCircle, FaCheckCircle, FaCheck, FaHeart } from 'react-icons/fa';
+import { FaArrowLeft, FaEdit, FaUtensils, FaChartBar, FaEye, FaLeaf, FaListUl, FaInfoCircle, FaRegLightbulb, FaExclamationCircle, FaCheckCircle, FaCheck, FaHeart, FaImage, FaUpload } from 'react-icons/fa';
 
 // Props interface for FormSection component
 interface FormSectionProps {
@@ -61,6 +61,7 @@ const RecipeCreate: React.FC = () => {
   const [showMacros, setShowMacros] = useState(false);
   const [prepTimeMinutes, setPrepTimeMinutes] = useState<number | undefined>(undefined);
   const [showPrepTime, setShowPrepTime] = useState(false);
+  const [recipeImage, setRecipeImage] = useState<File | null>(null);
   
   // Split recipe details into instructions
   const instructionsArray = useMemo(() => {
@@ -366,6 +367,11 @@ const RecipeCreate: React.FC = () => {
       const formData = new FormData();
       formData.append('request', new Blob([JSON.stringify(requestObj)], { type: 'application/json' }));
       
+      // Add the image file if one is selected
+      if (recipeImage) {
+        formData.append('image', recipeImage);
+      }
+      
       // Determine endpoint and method based on edit/create mode
       const endpoint = isEditing ? `/v1/recipes/${id}` : '/v1/recipes/create-meal';
       const method = isEditing ? 'put' : 'post';
@@ -377,7 +383,9 @@ const RecipeCreate: React.FC = () => {
       // Show success and navigate
       const newRecipeId = response.data.id || id;
       setSuccessMessage(isEditing ? 'Recipe updated successfully!' : 'Recipe created successfully!');
-      setTimeout(() => navigate(`/recipes/${newRecipeId}`), 1500);
+      
+      // Redirect to My Recipes page after a short delay
+      setTimeout(() => navigate('/recipe/my-recipes'), 1500);
     } catch (err: any) {
       console.error('Error submitting recipe:', err);
       
@@ -465,7 +473,7 @@ const RecipeCreate: React.FC = () => {
     );
   };
 
-  // If in preview mode, render the recipe preview
+  // If in preview mode, render the recipe preview with improved UI
   if (previewMode) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-indigo-900/20 p-4 sm:p-6 lg:p-8">
@@ -476,17 +484,42 @@ const RecipeCreate: React.FC = () => {
               onClick={() => (setPreviewMode(false), setSuccessMessage(''), setErrors({}))}
               className="group flex items-center text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-300 px-3 py-2 rounded-lg hover:bg-white/70 dark:hover:bg-gray-700"
             >
-              <FaArrowLeft className="mr-2 group-hover:-translate-x-1 transition-transform" /> Back to Edit
+              <FaEdit className="mr-2 group-hover:-translate-x-1 transition-transform" /> Back to Edit
             </button>
-            <button onClick={handleSubmit} className="flex items-center bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 font-medium">
-              <FaCheck className="mr-2" /> {isEditing ? 'Update Recipe' : 'Create Recipe'}
+            <button 
+              onClick={handleSubmit} 
+              className="flex items-center bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 font-medium"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  {isEditing ? 'Updating...' : 'Creating...'}
+                </span>
+              ) : (
+                <>
+                  <FaCheck className="mr-2" /> {isEditing ? 'Update Recipe' : 'Create Recipe'}
+                </>
+              )}
             </button>
           </div>
+          
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 p-5 relative overflow-hidden">
+              <h2 className="text-xl text-white font-bold">Recipe Preview</h2>
+              <p className="text-blue-100 text-sm">Review your recipe before publishing</p>
+            </div>
             <RecipePreview recipe={{
               id: id,
               mealName: recipeData.mealName,
-              imageUrl: recipeData.imageUrl,
+              imageUrl: recipeImage ? URL.createObjectURL(recipeImage) : recipeData.imageUrl,
               ingredientsUsed: recipeData.ingredientsUsed,
               recipeDetails: {
                 ingredientsList: recipeData.ingredientsUsed,
@@ -600,6 +633,76 @@ const RecipeCreate: React.FC = () => {
                   placeholder="e.g. Creamy Garlic Butter Tuscan Shrimp"
                   onErrorClear={() => clearError('mealName')}
                 />
+              </FormSection>
+              
+              {/* Image Upload */}
+              <FormSection 
+                icon={<FaImage className="text-indigo-500 dark:text-indigo-400" />} 
+                title="Recipe Image" 
+                color="indigo"
+                delay={50}
+              >
+                <div className="w-full">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                    Upload Recipe Image
+                  </label>
+                  <div 
+                    className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-xl
+                      border-gray-300 dark:border-gray-600
+                      hover:border-indigo-500 dark:hover:border-indigo-400 transition-colors duration-200 relative"
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files.length > 0) {
+                          const file = e.target.files[0];
+                          // Check if file size is less than 5MB
+                          if (file.size <= 5 * 1024 * 1024) {
+                            setRecipeImage(file);
+                          } else {
+                            // Show file size error
+                            setApiError("Image size must be less than 5MB");
+                          }
+                        }
+                      }}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+                    
+                    {recipeImage ? (
+                      <div className="flex flex-col items-center py-2">
+                        <img 
+                          src={URL.createObjectURL(recipeImage)} 
+                          alt="Recipe preview" 
+                          className="h-40 object-cover rounded-lg shadow-md mb-3" 
+                        />
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {recipeImage.name} ({(recipeImage.size / 1024 / 1024).toFixed(2)} MB)
+                        </p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setRecipeImage(null);
+                          }}
+                          className="mt-2 px-3 py-1 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 border border-red-300 dark:border-red-600 hover:border-red-500 dark:hover:border-red-500 rounded-full transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1 text-center py-8">
+                        <FaUpload className="mx-auto h-12 w-12 text-gray-400" />
+                        <div className="flex flex-col items-center text-sm text-gray-600 dark:text-gray-400">
+                          <p className="mt-1">Click to select an image</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            PNG, JPG, GIF up to 5MB
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </FormSection>
               
               {/* Preparation Time */}

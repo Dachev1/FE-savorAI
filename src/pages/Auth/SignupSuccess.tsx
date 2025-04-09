@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useLayoutEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { useToast } from '../../context/ToastContext';
+import { useAuth, useToast } from '../../context';
 import { Card } from '../../components/common';
 import { FiMail, FiExternalLink } from 'react-icons/fi';
 import { HiOutlineMailOpen } from 'react-icons/hi';

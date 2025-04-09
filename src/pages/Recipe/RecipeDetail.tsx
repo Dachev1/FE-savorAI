@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context';
 import { LoadingSpinner, MacrosDisplay } from '../../components/common';
 import CommentList from '../../components/comments/CommentList';
 import { FaHeart, FaRegHeart } from 'react-icons/fa';
@@ -98,11 +98,18 @@ const RecipeDetail: React.FC = () => {
     if (isLoading) return;
     
     setIsLoading(true);
+    
+    // Update UI optimistically
+    const newStatus = !isFavorite;
+    setIsFavorite(newStatus);
+    
     try {
-      const newStatus = await favoriteService.toggleFavorite(recipe.id);
-      setIsFavorite(newStatus);
+      // Call API to update server state
+      await favoriteService.toggleFavorite(recipe.id);
     } catch (error) {
       console.error('Failed to toggle favorite:', error);
+      // Revert optimistic update if the API call fails
+      setIsFavorite(!newStatus);
     } finally {
       setIsLoading(false);
     }
