@@ -1,125 +1,131 @@
-# SavorAI Frontend
+# SavorAI
 
 <p align="center">
-  <img src="public/logo.png" alt="SavorAI Logo" width="200" />
+  <img src="public/logo.png" alt="SavorAI Logo" width="200">
 </p>
 
 <p align="center">
-  A modern React application for AI-powered recipe generation and culinary management
+  <a href="https://github.com/yourusername/savorAI/releases">
+    <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
+  </a>
+  <a href="https://github.com/yourusername/savorAI/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
+  </a>
+  <a href="https://github.com/yourusername/savorAI/actions">
+    <img src="https://img.shields.io/badge/build-passing-success.svg" alt="Build Status">
+  </a>
+  <a href="https://react.dev/">
+    <img src="https://img.shields.io/badge/React-18-61DAFB.svg" alt="React">
+  </a>
+  <a href="https://www.typescriptlang.org/">
+    <img src="https://img.shields.io/badge/TypeScript-5.6-3178C6.svg" alt="TypeScript">
+  </a>
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#tech-stack">Tech Stack</a> •
-  <a href="#project-structure">Project Structure</a> •
-  <a href="#configuration">Configuration</a> •
-  <a href="#available-scripts">Available Scripts</a> •
-  <a href="#deployment">Deployment</a> •
-  <a href="#contributing">Contributing</a> •
-  <a href="#license">License</a>
+  AI-powered recipe generator and culinary management platform
 </p>
 
 ## ✨ Features
 
-- AI-powered recipe generation based on ingredients, cuisine, or dietary preferences
-- User authentication and profile management
-- Recipe saving, categorization, and sharing
-- Ingredient tracking and shopping list generation
-- Interactive cooking mode with step-by-step instructions
-- Responsive design for mobile, tablet, and desktop
+- **AI Recipe Generation** - Create custom recipes based on ingredients, dietary restrictions, and cuisine preferences
+- **Personal Recipe Collection** - Save, organize, and share your favorite recipes
+- **Responsive Design** - Seamless experience across desktop, tablet, and mobile devices
+- **User Authentication** - Secure login and personalized experience
+- **Interactive Cooking Mode** - Step-by-step guided cooking instructions
+
+## 📱 Screenshots
+
+<p align="center">
+  <img src="public/screenshots/home.png" alt="Home Screen" width="280">
+  <img src="public/screenshots/recipe.png" alt="Recipe View" width="280">
+  <img src="public/screenshots/generator.png" alt="Recipe Generator" width="280">
+</p>
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
+- Node.js v18+
 - npm or yarn
 
 ### Installation
 
-1. Clone the repository
 ```bash
+# Clone the repository
 git clone https://github.com/yourusername/savorAI.git
-cd savorAI/frontend
-```
+cd savorAI
 
-2. Install dependencies
-```bash
+# Install dependencies
 npm install
-# or
-yarn install
-```
 
-3. Set up environment variables
-Create a `.env` file in the root directory with the following variables:
-```
-VITE_API_URL=http://localhost:8081
-VITE_AUTH_REDIRECT_URL=http://localhost:5173/signin?verified=true
-```
+# Set up environment variables
+# Create .env file with required variables (example in .env.example)
 
-4. Start the development server
-```bash
+# Start development server
 npm run dev
-# or
-yarn dev
 ```
 
-The application will be available at `http://localhost:5173`
+Visit `http://localhost:5173` in your browser.
 
 ## 🔧 Tech Stack
 
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite for lightning-fast development and optimized builds
-- **Styling**: Tailwind CSS for utility-first styling
-- **UI Components**: Material UI for enhanced UI elements
-- **State Management**: React Context API for global state
-- **Routing**: React Router v7 for navigation
-- **Form Handling**: Formik with Yup validation
-- **HTTP Client**: Axios for API requests
-- **Animations**: Framer Motion and AOS for scroll animations
-- **Icons**: React Icons and Material UI Icons
-- **Date Management**: date-fns for date manipulations
-- **Notifications**: React Toastify for user notifications
+- **Frontend Framework**: React 18 with TypeScript
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS + Material UI
+- **State Management**: React Context API
+- **Routing**: React Router v7
+- **Form Handling**: Formik + Yup
+- **HTTP Client**: Axios
+- **Animation**: Framer Motion + AOS
+- **UI Components**: Custom components + Material UI
 
 ## 📁 Project Structure
 
 ```
-frontend/
-├── public/           # Static assets and favicon
-├── src/
-│   ├── api/          # API configuration and service functions
-│   ├── components/   # Reusable UI components
-│   ├── constants/    # Application constants and configuration
-│   ├── context/      # React context providers for state management
-│   ├── hooks/        # Custom React hooks
-│   ├── pages/        # Application pages/views
-│   ├── routes/       # Route definitions and navigation config
-│   ├── services/     # Business logic and data services
-│   ├── styles/       # Global styles and Tailwind configuration
-│   ├── types/        # TypeScript type definitions and interfaces
-│   ├── utils/        # Utility and helper functions
-│   ├── App.tsx       # Main application component
-│   ├── main.tsx      # Application entry point
-│   └── index.css     # Global CSS styles
+src/
+├── api/          # API services and configuration
+├── components/   # Reusable UI components
+├── constants/    # Application constants
+├── context/      # React context providers
+├── hooks/        # Custom React hooks
+├── pages/        # Application views/pages
+├── routes/       # Route definitions
+├── services/     # Business logic services
+├── styles/       # Global styles
+├── types/        # TypeScript types and interfaces
+├── utils/        # Utility functions
+├── App.tsx       # Main application component
+└── main.tsx      # Application entry point
 ```
 
 ## ⚙️ Configuration
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| VITE_API_URL | Backend API URL | http://localhost:8081 |
-| VITE_AUTH_REDIRECT_URL | Authentication redirect URL | http://localhost:5173/signin?verified=true |
+Create a `.env` file in the project root:
 
-### Proxy Configuration
+```
+# API Configuration
+VITE_API_URL=http://localhost:8082
+VITE_AUTH_REDIRECT_URL=http://localhost:5173/signin?verified=true
+```
 
-API requests are proxied to the backend server defined in `package.json`:
+### API Configuration
 
-```json
-{
-  "proxy": "http://localhost:8081"
+Backend API is proxied through `/api` to avoid CORS issues:
+
+```typescript
+// vite.config.ts
+server: {
+  proxy: {
+    '/api': {
+      target: 'http://localhost:8081',
+      changeOrigin: true,
+      secure: false,
+      rewrite: (path) => path.replace(/^\/api/, '')
+    }
+  }
 }
 ```
 
@@ -129,37 +135,66 @@ API requests are proxied to the backend server defined in `package.json`:
 |---------|-------------|
 | `npm run dev` | Start development server |
 | `npm run build` | Build for production |
-| `npm run serve` | Preview production build locally |
-| `npm run lint` | Run ESLint to check code quality |
-| `npm run clean` | Clean build artifacts and cache |
+| `npm run serve` | Preview production build |
+| `npm run lint` | Run ESLint |
+| `npm run preview` | Preview build |
+| `npm run clean` | Clean build artifacts |
+| `npm run analyze` | Analyze bundle size |
+| `npm run typecheck` | Check TypeScript types |
 
 ## 🚢 Deployment
 
-### Build for Production
-
 ```bash
+# Build for production
 npm run build
-```
 
-This generates optimized static files in the `dist` directory.
+# Preview production build locally
+npm run serve
+```
 
 ### Deployment Options
 
-- **Vercel**: Connect your GitHub repository for automatic deployments
-- **Netlify**: Connect to GitHub or upload the `dist` folder
-- **Docker**: Use the provided Dockerfile for containerized deployment
-- **Static Hosting**: Upload the `dist` directory to any static hosting service
+- **Vercel**: Connect GitHub repository for automatic deployments
+- **Netlify**: Connect GitHub or upload `dist` folder
+- **Docker**: Use included Dockerfile
+- **Static Hosting**: Deploy `dist` directory to any static host
+
+## 🔍 Performance Optimization
+
+- Code splitting via dynamic imports
+- Optimized chunk strategy for vendor dependencies
+- Image optimization with responsive loading
+- Lazy-loaded routes and components
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+- **API Connection Errors**: Verify backend server is running and `.env` has correct `VITE_API_URL`
+- **Build Errors**: Run `npm run clean` and try rebuilding
+- **TypeScript Errors**: Run `npm run typecheck` to identify issues
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+2. Create feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push to branch: `git push origin feature/amazing-feature`
 5. Open a Pull Request
 
-Please ensure your code follows the project's coding standards and includes appropriate tests.
+Please follow code style guidelines and include appropriate tests.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
+
+## 👥 Contributors
+
+- Your Name - [GitHub](https://github.com/yourusername)
+
+## 🙏 Acknowledgments
+
+- [React](https://react.dev/) - UI library
+- [Vite](https://vitejs.dev/) - Frontend tooling
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- [Material UI](https://mui.com/) - React UI components

@@ -13,8 +13,8 @@ const SignupSuccess = lazy(() => import('./pages/Auth/SignupSuccess'));
 const RecipeGenerator = lazy(() => import('./pages/Recipe/RecipeGenerator'));
 const RecipeDetail = lazy(() => import('./pages/Recipe/RecipeDetail'));
 const RecipeCreate = lazy(() => import('./pages/Recipe/RecipeCreate'));
-const UserRecipes = lazy(() => import('./pages/Recipe/UserRecipes'));
-const AllRecipes = lazy(() => import('./pages/Recipe/AllRecipes'));
+const MyRecipes = lazy(() => import('./pages/Recipe/MyRecipes'));
+const RecipeFeed = lazy(() => import('./pages/Recipe/RecipeFeed'));
 const AdminDashboard = lazy(() => import('./pages/Admin/AdminDashboard'));
 const AccountSettings = lazy(() => import('./pages/Profile/AccountSettings'));
 const Error = lazy(() => import('./pages/Error'));
@@ -32,8 +32,9 @@ export const ROUTES = {
   RECIPE_DETAIL: '/recipes/:id',
   RECIPE_CREATE: '/recipe/create',
   RECIPE_EDIT: '/recipe/create/:id',
+  RECIPE_EDIT_LEGACY: '/recipes/edit/:id',
   USER_RECIPES: '/recipe/my-recipes',
-  ALL_RECIPES: '/recipes/community',
+  RECIPE_FEED: '/recipes/feed',
   ADMIN_DASHBOARD: '/admin',
   ACCOUNT_SETTINGS: '/profile',
   ERROR_404: '*',
@@ -53,8 +54,9 @@ export const routes = [
   { path: ROUTES.RECIPE_DETAIL, component: RecipeDetail },
   { path: ROUTES.RECIPE_CREATE, component: RecipeCreate },
   { path: ROUTES.RECIPE_EDIT, component: RecipeCreate },
-  { path: ROUTES.USER_RECIPES, component: UserRecipes },
-  { path: ROUTES.ALL_RECIPES, component: AllRecipes, authRequired: true },
+  { path: ROUTES.RECIPE_EDIT_LEGACY, component: RecipeCreate },
+  { path: ROUTES.USER_RECIPES, component: MyRecipes, authRequired: true },
+  { path: ROUTES.RECIPE_FEED, component: RecipeFeed, authRequired: true },
   { path: ROUTES.ADMIN_DASHBOARD, component: AdminDashboard },
   { path: ROUTES.ACCOUNT_SETTINGS, component: AccountSettings },
   { path: ROUTES.ERROR_404, component: Error },

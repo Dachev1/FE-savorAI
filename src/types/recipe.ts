@@ -34,12 +34,16 @@ export interface NutritionalInformation {
     description?: string;
     instructions?: string;
     aiGenerated?: boolean;
-    prepTimeMinutes?: number;
+    totalTimeMinutes?: number;
+    difficulty?: string;
     macros?: Macros;
     author?: {
       id?: string;
       username?: string;
     };
+    upvotes?: number;
+    downvotes?: number;
+    userVote?: 'UPVOTE' | 'DOWNVOTE' | null;
     createdAt?: string;
     updatedAt?: string;
   }

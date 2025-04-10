@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Modal from '../common/Modal/Modal';
 import { FaRegCopy, FaHeart, FaRegHeart, FaUtensils, FaList, FaClipboardList, FaInfoCircle, FaChevronRight, FaRobot, FaStar, FaMagic } from 'react-icons/fa';
 import { RecipeResponse, RecipeDetails } from '../../types/recipe';
@@ -21,18 +21,37 @@ const FavoriteButton = ({
   isInModal?: boolean;
 }) => {
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
-  // Use local state for immediate visual feedback
-  const [visuallyActive, setVisuallyActive] = useState(isFavorite);
+  const [hasError, setHasError] = useState(false);
+  const [internalState, setInternalState] = useState<boolean>(false);
   
-  // Keep visual state in sync with prop
+  // Only used for debugging
+  const buttonId = useRef(`fb-${Math.random().toString(36).substring(2, 8)}`).current;
+  
+  // Debug state changes
   useEffect(() => {
-    setVisuallyActive(isFavorite);
-  }, [isFavorite]);
+    console.log(`[DEBUG-FAV ${buttonId}] Initial props isFavorite:`, isFavorite, typeof isFavorite);
+  }, []);
+  
+  // Update internal state when prop changes
+  useEffect(() => {
+    console.log(`[DEBUG-FAV ${buttonId}] Props changed - isFavorite:`, isFavorite, typeof isFavorite, "isModal:", isInModal);
+    const boolValue = isFavorite === true;
+    console.log(`[DEBUG-FAV ${buttonId}] Converting to boolean: ${boolValue}`);
+    setInternalState(boolValue);
+    if (isFavorite !== undefined) setHasError(false);
+  }, [isFavorite, buttonId, isInModal]);
+  
+  // Debug internal state changes
+  useEffect(() => {
+    console.log(`[DEBUG-FAV ${buttonId}] Internal state updated:`, internalState);
+  }, [internalState, buttonId]);
   
   const btnClasses = `${isInModal ? 'px-8 py-4' : 'px-4 py-3'} rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 ${
-    visuallyActive 
-      ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30' 
-      : 'bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
+    hasError 
+      ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500' 
+      : internalState 
+        ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30' 
+        : 'bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
   }`;
   
   const iconClasses = isInModal ? "mr-3 text-xl" : "";
@@ -43,20 +62,35 @@ const FavoriteButton = ({
     e.stopPropagation();
     e.preventDefault();
     
-    if (isTogglingFavorite) return;
+    if (isTogglingFavorite || hasError) {
+      console.log(`[DEBUG-FAV ${buttonId}] Click blocked - isTogglingFavorite:`, isTogglingFavorite, "hasError:", hasError);
+      return;
+    }
     
-    // Toggle visual state immediately
-    setVisuallyActive(!visuallyActive);
+    console.log(`[DEBUG-FAV ${buttonId}] Click - toggling from:`, internalState, "to:", !internalState);
     setIsTogglingFavorite(true);
+    setHasError(false);
+    
+    // Update UI immediately for better UX
+    setInternalState(!internalState);
     
     // Call parent handler
     onToggleFavorite()
+      .then((result) => {
+        console.log(`[DEBUG-FAV ${buttonId}] API returned:`, result, typeof result);
+        // Ensure boolean result and match server response
+        const boolResult = result === true;
+        console.log(`[DEBUG-FAV ${buttonId}] Converted API result to boolean:`, boolResult);
+        setInternalState(boolResult);
+      })
       .catch((error) => {
-        // Revert on error
-        console.error('Error toggling favorite:', error);
-        setVisuallyActive(visuallyActive);
+        console.error(`[DEBUG-FAV ${buttonId}] Error:`, error);
+        // Revert to original state on error
+        setInternalState(internalState);
+        setHasError(true);
       })
       .finally(() => {
+        console.log(`[DEBUG-FAV ${buttonId}] Finished toggle operation`);
         setIsTogglingFavorite(false);
       });
   };
@@ -64,21 +98,28 @@ const FavoriteButton = ({
   return (
     <button
       onClick={handleClick}
-      disabled={isTogglingFavorite}
+      disabled={isTogglingFavorite || hasError}
       className={btnClasses}
-      aria-label={visuallyActive ? 'Remove from favorites' : 'Add to favorites'}
+      aria-label={hasError ? 'Error saving favorite' : internalState ? 'Remove from favorites' : 'Add to favorites'}
       style={{ willChange: 'transform, background-color' }}
     >
       <div className={isTogglingFavorite ? `animate-pulse ${iconClasses}` : iconClasses}>
-        {visuallyActive ? 
-          <FaHeart className="text-red-500" /> : 
+        {hasError ? (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ) : internalState ? (
+          <FaHeart className="text-red-500" />
+        ) : (
           <FaRegHeart className={isInModal ? "text-gray-600 dark:text-gray-400 hover:text-red-400" : "text-blue-600 dark:text-blue-400"} />
-        }
+        )}
       </div>
       <span className={textClasses}>
-        {isInModal 
-          ? (visuallyActive ? 'Saved to Favorites' : 'Save to Favorites')
-          : (visuallyActive ? 'Saved' : 'Save')
+        {hasError 
+          ? 'Server Error' 
+          : isInModal 
+            ? (internalState ? 'Saved to Favorites' : 'Save to Favorites')
+            : (internalState ? 'Saved' : 'Save')
         }
       </span>
     </button>
@@ -91,8 +132,46 @@ const AIGeneratedMealCard: React.FC<AIGeneratedMealCardProps> = ({
   onCopy,
   onToggleFavorite,
 }) => {
-  console.log('AIGeneratedMealCard: rendering with isFavorite =', isFavorite);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  
+  // Reset error state when recipe or favorite status changes
+  useEffect(() => {
+    setHasError(false);
+  }, [recipe.id, isFavorite]);
+
+  // Handle favorites toggle
+  const handleToggleFavorite = async () => {
+    if (isSaving || hasError) {
+      console.log('[DEBUG-CARD] Toggle blocked - already saving or has error:', 
+        { isSaving, hasError, currentState: isFavorite });
+      return isFavorite === true;
+    }
+    
+    console.log('[DEBUG-CARD] Starting toggle favorite from state:', isFavorite);
+    setIsSaving(true);
+    setHasError(false);
+    
+    try {
+      console.log('[DEBUG-CARD] Calling parent onToggleFavorite function');
+      const result = await onToggleFavorite();
+      console.log('[DEBUG-CARD] Parent onToggleFavorite returned:', result, typeof result);
+      
+      // Ensure boolean result
+      const boolResult = result === true;
+      console.log('[DEBUG-CARD] Converted to boolean:', boolResult);
+      
+      return boolResult;
+    } catch (err) {
+      console.error('[DEBUG-CARD] Error in toggle favorite:', err);
+      setHasError(true);
+      return isFavorite === true;
+    } finally {
+      console.log('[DEBUG-CARD] Toggle favorite operation completed');
+      setIsSaving(false);
+    }
+  };
   
   // Get recipe name (handle different property names)
   const recipeName = recipe.mealName || 'Untitled Recipe';
@@ -105,6 +184,22 @@ const AIGeneratedMealCard: React.FC<AIGeneratedMealCardProps> = ({
       (recipe.recipeDetails as RecipeDetails).ingredientsList : 
       (recipe.ingredientsUsed || []);
 
+  // Process difficulty and cooking time - ensure we have valid values
+  const difficulty = recipe.difficulty || 'EASY';
+  const cookingTime = recipe.totalTimeMinutes || 30;
+  
+  // Helper function to get difficulty color
+  const getDifficultyColor = (level: string) => {
+    switch(level.toUpperCase()) {
+      case 'EASY': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/20';
+      case 'MEDIUM': return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/20';
+      case 'HARD': return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/20';
+      default: return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/20';
+    }
+  };
+  
+  const difficultyColor = getDifficultyColor(difficulty);
+  
   return (
     <>
       <div className="mt-8 bg-gradient-to-br from-white to-blue-50 dark:from-gray-800 dark:to-blue-900/30 rounded-2xl shadow-2xl p-6 border border-blue-100 dark:border-blue-900/50 transition-all duration-300 hover:shadow-blue-100/50 dark:hover:shadow-blue-500/10 relative overflow-hidden">
@@ -120,6 +215,23 @@ const AIGeneratedMealCard: React.FC<AIGeneratedMealCardProps> = ({
           {recipeName}
         </h2>
 
+        {/* Add cooking time and difficulty info */}
+        <div className="mb-6 flex justify-center gap-4 relative z-10">
+          <div className="px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-sm border border-blue-100 dark:border-blue-900/50 bg-white dark:bg-gray-800">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="font-medium">{cookingTime} min</span>
+          </div>
+          
+          <div className={`px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-sm border border-blue-100 dark:border-blue-900/50 ${difficultyColor}`}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span className="font-medium">{difficulty}</span>
+          </div>
+        </div>
+
         <div className="mb-6 flex justify-center relative z-10">
           {recipe.imageUrl ? (
             <div className="relative w-full max-w-md overflow-hidden rounded-xl shadow-xl transform transition-all duration-500 hover:scale-[1.02] group">
@@ -127,6 +239,11 @@ const AIGeneratedMealCard: React.FC<AIGeneratedMealCardProps> = ({
                 src={recipe.imageUrl}
                 alt={recipeName}
                 className="w-full h-[300px] object-cover"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null; // Prevent infinite loop
+                  target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop";
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center text-white">
@@ -161,7 +278,7 @@ const AIGeneratedMealCard: React.FC<AIGeneratedMealCardProps> = ({
             Copy Recipe
           </button>
 
-          <FavoriteButton isFavorite={isFavorite} onToggleFavorite={onToggleFavorite} />
+          <FavoriteButton isFavorite={isFavorite} onToggleFavorite={handleToggleFavorite} />
         </div>
       </div>
 
@@ -185,6 +302,23 @@ const AIGeneratedMealCard: React.FC<AIGeneratedMealCardProps> = ({
               <h2 className="text-5xl font-bold text-white mb-4 font-serif">
                 {recipeName}
               </h2>
+              
+              {/* Add cooking time and difficulty info to modal */}
+              <div className="flex justify-center gap-4">
+                <div className="px-4 py-2 rounded-lg flex items-center gap-2 bg-white/20 backdrop-blur-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="font-medium text-white">{cookingTime} min</span>
+                </div>
+                
+                <div className="px-4 py-2 rounded-lg flex items-center gap-2 bg-white/20 backdrop-blur-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span className="font-medium text-white">{difficulty}</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -304,7 +438,7 @@ const AIGeneratedMealCard: React.FC<AIGeneratedMealCardProps> = ({
               <span className="text-lg font-semibold">Copy Recipe</span>
             </button>
             
-            <FavoriteButton isFavorite={isFavorite} onToggleFavorite={onToggleFavorite} isInModal={true} />
+            <FavoriteButton isFavorite={isFavorite} onToggleFavorite={handleToggleFavorite} isInModal={true} />
           </div>
         </div>
       </Modal>

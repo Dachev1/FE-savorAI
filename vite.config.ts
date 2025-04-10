@@ -68,6 +68,12 @@ export default defineConfig(({ mode }) => {
               return 'api-client'
             }
             
+            // Material UI components
+            if (id.indexOf('node_modules/@mui') !== -1 || 
+                id.indexOf('node_modules/@emotion') !== -1) {
+              return 'material-ui'
+            }
+            
             // Remaining node_modules go into vendor chunk
             if (id.indexOf('node_modules') !== -1) {
               return 'vendor'
@@ -107,7 +113,7 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
     },
     optimizeDeps: {
-      include: ['react', 'react-dom', 'react-router-dom'],
+      include: ['react', 'react-dom', 'react-router-dom', '@mui/material', 'framer-motion', 'axios'],
       exclude: ['web-vitals'],
     },
     esbuild: {

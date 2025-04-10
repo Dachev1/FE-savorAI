@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, ReactNode } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
-import axios from '../../api/axiosConfig.tsx';
+import { recipeService } from '../../api/serviceApi';
 import TextInput from '../../components/common/Input/TextInput';
 import TextArea from '../../components/common/Input/TextArea';
 import { CreateIngredientsInput } from '../../components/common/Input/CreateIngredientsInput';
 import MacrosInput from '../../components/common/Input/MacrosInput';
 import { IFormErrors, IMacros, IRecipeFormData } from '../../types/recipeForm';
 import RecipePreview from './RecipePreview';
-import { FaArrowLeft, FaEdit, FaUtensils, FaChartBar, FaEye, FaLeaf, FaListUl, FaInfoCircle, FaRegLightbulb, FaExclamationCircle, FaCheckCircle, FaCheck, FaHeart, FaImage, FaUpload } from 'react-icons/fa';
+import { FaArrowLeft, FaUtensils, FaChartBar, FaEye, FaListUl, FaInfoCircle, FaRegLightbulb, FaExclamationCircle, FaCheckCircle, FaCheck, FaImage, FaUpload, FaClock } from 'react-icons/fa';
 
 // Props interface for FormSection component
 interface FormSectionProps {
@@ -17,27 +17,231 @@ interface FormSectionProps {
   title: string;
   children: ReactNode;
   color: string;
-  delay?: number;
 }
 
 // Section component for consistent styling
-const FormSection: React.FC<FormSectionProps> = ({ icon, title, children, color, delay = 0 }) => (
+const FormSection: React.FC<FormSectionProps> = ({ icon, title, children, color }) => (
   <div 
-    className={`p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-${color}-100 dark:border-${color}-900/30 hover:shadow-md transition-all duration-300 mb-6 transform hover:-translate-y-1`}
+    className={`p-8 bg-white/95 dark:bg-gray-800/90 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 mb-8 backdrop-blur-sm`}
+    style={{ 
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)', 
+    }}
   >
-    <div className="flex items-center mb-5">
-      <div className={`p-2.5 bg-${color}-50 dark:bg-${color}-900/20 rounded-lg text-${color}-500`}>
+    <div className="flex items-center mb-7">
+      <div className={`p-3.5 bg-${color}-50/90 dark:bg-${color}-900/30 rounded-xl text-${color}-500 shadow-sm`}>
         {icon}
       </div>
-      <h3 className="ml-3 text-lg font-semibold bg-gradient-to-r from-gray-800 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+      <h3 className="ml-4 text-xl font-medium text-gray-800 dark:text-white">
         {title}
       </h3>
     </div>
-    <div className="ml-1">
+    <div className="space-y-5">
       {children}
     </div>
   </div>
 );
+
+// RecipePreviewComponent optimized
+const RecipePreviewComponent: React.FC<{
+  recipe: any;
+  previewImage?: File;
+  isOwnRecipe?: boolean;
+}> = ({ recipe, previewImage }) => {
+  // Helper function to get image source
+  const getImageContent = () => {
+    if (previewImage) {
+      return (
+        <img
+          src={URL.createObjectURL(previewImage)}
+          alt={recipe.mealName || 'Recipe preview'}
+          className="w-full h-full object-cover"
+        />
+      );
+    } 
+    
+    if (recipe.imageUrl) {
+      return (
+        <img
+          src={recipe.imageUrl}
+          alt={recipe.mealName || 'Recipe preview'}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.onerror = null;
+            target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop";
+          }}
+        />
+      );
+    }
+    
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
+        <FaUtensils className="text-white text-5xl opacity-30" />
+      </div>
+    );
+  };
+
+  // Helper function to check if macros exist and have values
+  const hasMacros = () => {
+    return recipe.macros && (
+      recipe.macros.calories > 0 || 
+      recipe.macros.protein > 0 || 
+      recipe.macros.carbs > 0 || 
+      recipe.macros.fat > 0 || 
+      recipe.macros.proteinGrams > 0 || 
+      recipe.macros.carbsGrams > 0 || 
+      recipe.macros.fatGrams > 0
+    );
+  };
+
+  // Parse instructions into separate steps
+  const parseInstructions = () => {
+    if (!recipe.recipeDetails) return [];
+    
+    return recipe.recipeDetails
+      .split(/\n+/)
+      .map((line: string) => line.trim())
+      .filter((line: string) => line.length > 0);
+  };
+
+  // Common section title style
+  const sectionTitleClass = "text-xl font-semibold mb-5 border-b border-gray-100 dark:border-gray-700 pb-3";
+
+  return (
+    <div className="bg-white/95 dark:bg-gray-800/95 rounded-2xl shadow-lg overflow-hidden backdrop-blur-sm ring-1 ring-gray-100 dark:ring-gray-700">
+      {/* Recipe header */}
+      <div className="relative h-96 w-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+        {getImageContent()}
+        
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent"></div>
+        <div className="absolute bottom-0 left-0 right-0 p-8 z-10">
+          <h2 className="text-4xl font-bold text-white mb-3">{recipe.mealName || 'Untitled Recipe'}</h2>
+          
+          <div className="flex flex-wrap gap-3 mt-3">
+            {recipe.totalTimeMinutes && (
+              <span className="bg-white/20 backdrop-blur-md text-white px-4 py-1.5 rounded-full text-sm flex items-center">
+                <FaClock className="mr-2" aria-hidden="true" />
+                {recipe.totalTimeMinutes} min
+              </span>
+            )}
+            
+            {recipe.difficulty && (
+              <span className={`${getDifficultyColor(recipe.difficulty)} backdrop-blur-md text-white px-4 py-1.5 rounded-full text-sm`}>
+                {formatDifficulty(recipe.difficulty)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      <div className="p-8">
+        {/* Ingredients */}
+        <div className="mb-10">
+          <h3 className={sectionTitleClass}>
+            Ingredients
+          </h3>
+          
+          {recipe.ingredientsUsed && recipe.ingredientsUsed.length > 0 ? (
+            <ul className="space-y-3 pl-1">
+              {recipe.ingredientsUsed.map((ingredient: string, index: number) => (
+                <li key={index} className="flex items-start gap-3 group">
+                  <span className="text-blue-500 dark:text-blue-400 text-lg group-hover:scale-110 transition-transform duration-200">•</span>
+                  <span className="text-gray-700 dark:text-gray-300">{ingredient}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-500 italic">No ingredients added yet</p>
+          )}
+        </div>
+        
+        {/* Instructions */}
+        <div className="mb-10">
+          <h3 className={`${sectionTitleClass} flex items-center gap-2`}>
+            <span className="bg-blue-50 dark:bg-blue-900/20 text-blue-500 p-1 rounded-md">
+              <FaRegLightbulb className="h-5 w-5" />
+            </span>
+            Instructions
+          </h3>
+          
+          {recipe.recipeDetails ? (
+            <div className="space-y-6 bg-blue-50/20 dark:bg-blue-900/5 p-5 rounded-xl border border-blue-100/50 dark:border-blue-800/10">
+              {parseInstructions().map((instruction, index) => (
+                <div 
+                  key={index} 
+                  className="flex items-start gap-4 group hover:bg-blue-50/40 dark:hover:bg-blue-900/10 p-4 rounded-xl transition-all duration-200 border border-transparent hover:border-blue-100 dark:hover:border-blue-800/20"
+                >
+                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full h-8 w-8 flex-shrink-0 flex items-center justify-center font-semibold shadow-sm group-hover:scale-110 transition-transform duration-200">
+                    {index + 1}
+                  </div>
+                  <div className="text-gray-700 dark:text-gray-300 leading-relaxed pt-1">
+                    {instruction}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 italic">No instructions added yet</p>
+          )}
+        </div>
+
+        {/* Serving Suggestions - only display if exists */}
+        {recipe.servingSuggestions && (
+          <div className="mb-10">
+            <h3 className={sectionTitleClass}>
+              Serving Suggestions
+            </h3>
+            <div className="p-6 bg-blue-50/80 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/30 text-gray-700 dark:text-gray-300 backdrop-blur-sm">
+              {recipe.servingSuggestions}
+            </div>
+          </div>
+        )}
+        
+        {/* Nutrition - only display if macros have values */}
+        {hasMacros() && (
+          <div className="mb-10">
+            <h3 className={sectionTitleClass}>
+              Nutrition Information
+            </h3>
+            
+            <div className="grid grid-cols-4 gap-4">
+              <div className="bg-red-50/80 dark:bg-red-900/20 p-4 rounded-xl text-center shadow-sm backdrop-blur-sm transition-all duration-200 hover:shadow-md hover:translate-y-[-2px]">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Calories</p>
+                <p className="font-bold text-xl text-red-600 dark:text-red-400">{recipe.macros.calories}</p>
+              </div>
+              <div className="bg-blue-50/80 dark:bg-blue-900/20 p-4 rounded-xl text-center shadow-sm backdrop-blur-sm transition-all duration-200 hover:shadow-md hover:translate-y-[-2px]">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Protein</p>
+                <p className="font-bold text-xl text-blue-600 dark:text-blue-400">{recipe.macros.protein || recipe.macros.proteinGrams}g</p>
+              </div>
+              <div className="bg-yellow-50/80 dark:bg-yellow-900/20 p-4 rounded-xl text-center shadow-sm backdrop-blur-sm transition-all duration-200 hover:shadow-md hover:translate-y-[-2px]">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Carbs</p>
+                <p className="font-bold text-xl text-yellow-600 dark:text-yellow-400">{recipe.macros.carbs || recipe.macros.carbsGrams}g</p>
+              </div>
+              <div className="bg-green-50/80 dark:bg-green-900/20 p-4 rounded-xl text-center shadow-sm backdrop-blur-sm transition-all duration-200 hover:shadow-md hover:translate-y-[-2px]">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Fat</p>
+                <p className="font-bold text-xl text-green-600 dark:text-green-400">{recipe.macros.fat || recipe.macros.fatGrams}g</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Helper functions
+const getDifficultyColor = (difficulty: string = 'MEDIUM'): string => {
+  switch(difficulty.toUpperCase()) {
+    case 'EASY': return 'bg-green-500/80';
+    case 'MEDIUM': return 'bg-blue-500/80';
+    case 'HARD': return 'bg-red-500/80';
+    default: return 'bg-gray-500/80';
+  }
+};
+
+const formatDifficulty = (difficulty: string = 'MEDIUM'): string => {
+  return difficulty.charAt(0) + difficulty.slice(1).toLowerCase();
+};
 
 const RecipeCreate: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -55,13 +259,17 @@ const RecipeCreate: React.FC = () => {
   const [macros, setMacros] = useState<IMacros>({
     calories: 0,
     protein: 0,
-    carbohydrates: 0,
+    carbs: 0,
     fat: 0
   });
   const [showMacros, setShowMacros] = useState(false);
-  const [prepTimeMinutes, setPrepTimeMinutes] = useState<number | undefined>(undefined);
-  const [showPrepTime, setShowPrepTime] = useState(false);
+  const [totalTimeMinutes, setTotalTimeMinutes] = useState<number | undefined>(undefined);
+  const [showTime, setShowTime] = useState(false);
+  const [servingSuggestions, setServingSuggestions] = useState<string>('');
+  const [showServingSuggestions, setShowServingSuggestions] = useState(false);
   const [recipeImage, setRecipeImage] = useState<File | null>(null);
+  const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('MEDIUM');
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
   
   // Split recipe details into instructions
   const instructionsArray = useMemo(() => {
@@ -73,56 +281,33 @@ const RecipeCreate: React.FC = () => {
       .filter(line => line.length > 0);
   }, [recipeDetails]);
   
-  // Combine recipe data
-  const recipeData = useMemo<IRecipeFormData>(() => ({
-    mealName,
-    imageUrl: '',
-    ingredientsUsed: ingredients,
-    recipeDetails: recipeDetails,
-    prepTimeMinutes: showPrepTime ? prepTimeMinutes : undefined,
-    showPrepTime,
-    macros: showMacros ? macros : null,
-    showMacros
-  }), [mealName, ingredients, recipeDetails, showMacros, macros, prepTimeMinutes, showPrepTime]);
-
   // UI state
   const [apiError, setApiError] = useState<string | null>(null);
-  const [errorNotificationVisible, setErrorNotificationVisible] = useState(false);
-
-  // Monitor errors and control animation only on first appearance
-  useEffect(() => {
-    const hasErrors = Object.keys(errors).length > 0;
-    if (hasErrors && !errorNotificationVisible) {
-      setErrorNotificationVisible(true);
-    } else if (!hasErrors && errorNotificationVisible) {
-      setErrorNotificationVisible(false);
-    }
-  }, [errors, errorNotificationVisible]);
 
   // Initialize animations - with proper cleanup
   useEffect(() => {
+    document.title = isEditing ? 'Edit Recipe | SavorAI' : 'Create Recipe | SavorAI';
+    
     AOS.init({ 
       duration: 800, 
       once: true,
       easing: 'ease-out-cubic',
       delay: 50,
-      disable: 'mobile' // Disable on mobile to avoid potential issues
+      disable: 'mobile'
     });
     
-    // Clean up AOS on unmount
     return () => {
-      // Remove AOS attributes from DOM to avoid React reconciliation conflicts
       document.querySelectorAll('[data-aos]').forEach(el => {
         el.removeAttribute('data-aos');
         el.removeAttribute('data-aos-delay');
         el.removeAttribute('data-aos-duration');
       });
+      document.title = 'SavorAI';
     };
-  }, []);
+  }, [isEditing]);
 
   // Replace dynamic style injection with static styles
   useEffect(() => {
-    // Static approach instead of dynamic style injection
     const hasAnimationStyles = document.getElementById('recipe-create-animations');
     if (!hasAnimationStyles) {
       const styleEl = document.createElement('style');
@@ -145,26 +330,13 @@ const RecipeCreate: React.FC = () => {
       document.head.appendChild(styleEl);
     }
     
-    // Clean up on unmount
     return () => {
       const styleEl = document.getElementById('recipe-create-animations');
-      if (styleEl) {
-        // Use safe removal pattern
-        const parent = styleEl.parentNode;
-        if (parent) {
-          parent.removeChild(styleEl);
-        }
+      if (styleEl && styleEl.parentNode) {
+        styleEl.parentNode.removeChild(styleEl);
       }
     };
   }, []);
-
-  // Effect to show success message when errors are fixed
-  useEffect(() => {
-    if (previewMode && Object.keys(errors).length === 0) {
-      setSuccessMessage('Preview mode activated');
-      setTimeout(() => setSuccessMessage(''), 1500);
-    }
-  }, [errors, previewMode]);
 
   // Fetch recipe data if in edit mode
   useEffect(() => {
@@ -172,42 +344,82 @@ const RecipeCreate: React.FC = () => {
       const fetchRecipe = async () => {
         setIsLoading(true);
         try {
-          const response = await axios.get(`/v1/recipes/${id}`);
+          const response = await recipeService.getRecipeById(id);
           const recipeData = response.data;
           
-          setMealName(recipeData.mealName || '');
-          setIngredients(recipeData.ingredientsUsed || []);
+          setMealName(recipeData.title || recipeData.mealName || '');
+          setIngredients(recipeData.ingredients || recipeData.ingredientsUsed || []);
           
-          // Handle different formats of recipeDetails
-          if (typeof recipeData.recipeDetails === 'string') {
+          // Handle different formats of recipe instructions
+          if (recipeData.instructions) {
+            setRecipeDetails(recipeData.instructions);
+          } else if (typeof recipeData.recipeDetails === 'string') {
             setRecipeDetails(recipeData.recipeDetails);
           } else if (recipeData.recipeDetails && typeof recipeData.recipeDetails === 'object') {
-            // Format structured recipeDetails into a string
             const details = recipeData.recipeDetails;
             let formattedDetails = '';
             
             if (details.instructions && Array.isArray(details.instructions)) {
-              formattedDetails += "Instructions:\n" + details.instructions.join('\n') + '\n\n';
-            }
-            
-            if (details.servingSuggestions && Array.isArray(details.servingSuggestions)) {
-              formattedDetails += "Serving Suggestions:\n" + details.servingSuggestions.join('\n');
+              formattedDetails += details.instructions.join('\n');
             }
             
             setRecipeDetails(formattedDetails);
           }
           
+          // Handle different formats of recipe macros
           if (recipeData.macros) {
-            setMacros(recipeData.macros);
+            setMacros({
+              calories: recipeData.macros.calories || 0,
+              protein: recipeData.macros.protein || recipeData.macros.proteinGrams || 0,
+              carbs: recipeData.macros.carbs || recipeData.macros.carbsGrams || 0,
+              fat: recipeData.macros.fat || recipeData.macros.fatGrams || 0
+            });
             setShowMacros(true);
           }
           
-          if (recipeData.prepTimeMinutes) {
-            setPrepTimeMinutes(recipeData.prepTimeMinutes);
+          // Set cooking time
+          if (recipeData.totalTimeMinutes) {
+            setTotalTimeMinutes(recipeData.totalTimeMinutes);
+            setShowTime(true);
+          } else if (recipeData.prepTimeMinutes) {
+            setTotalTimeMinutes(recipeData.prepTimeMinutes);
+            setShowTime(true);
           }
-        } catch (error) {
-          console.error('Failed to fetch recipe:', error);
-          setApiError('Failed to load recipe data. Please try again.');
+
+          // Set serving suggestions if available
+          if (recipeData.servingSuggestions) {
+            setServingSuggestions(recipeData.servingSuggestions);
+            setShowServingSuggestions(true);
+          }
+
+          // Set difficulty if available
+          if (recipeData.difficulty) {
+            setDifficulty(recipeData.difficulty as 'EASY' | 'MEDIUM' | 'HARD');
+          }
+
+          // Set image URL if exists
+          if (recipeData.imageUrl) {
+            setExistingImageUrl(recipeData.imageUrl);
+          }
+        } catch (error: any) {
+          console.error('Failed to fetch recipe for editing:', error);
+          // Provide more detailed error info for debugging
+          if (error.response) {
+            // The request was made and the server responded with a status code
+            // that falls out of the range of 2xx
+            console.error('Error response data:', error.response.data);
+            console.error('Error response status:', error.response.status);
+            console.error('Error response headers:', error.response.headers);
+            setApiError(`Failed to load recipe data. Server error: ${error.response.status}. ${error.response.data?.message || ''}`);
+          } else if (error.request) {
+            // The request was made but no response was received
+            console.error('Error request:', error.request);
+            setApiError('Failed to load recipe data. No response received from server.');
+          } else {
+            // Something happened in setting up the request that triggered an Error
+            console.error('Error message:', error.message);
+            setApiError(`Failed to load recipe data: ${error.message}`);
+          }
         } finally {
           setIsLoading(false);
         }
@@ -215,21 +427,16 @@ const RecipeCreate: React.FC = () => {
       
       fetchRecipe();
     }
-  }, [id, isEditing]);
+  }, [isEditing, id]);
 
-
-  // Combined function to handle input changes
-  const handleInputChange = (field: 'mealName' | 'recipeDetails', value: string) => {
-    // Update the appropriate state
-    field === 'mealName' ? setMealName(value) : setRecipeDetails(value);
+  // Clear errors efficiently with early return
+  const clearError = (field: keyof IFormErrors) => {
+    if (!errors[field]) return;
     
-    // Clear error if value is not empty
-    if (errors[field] && value.trim()) clearError(field);
+    const newErrors = {...errors};
+    delete newErrors[field];
+    setErrors(newErrors);
   };
-  
-  // Simplified handler functions using the combined approach
-  const handleMealNameChange = (value: string) => handleInputChange('mealName', value);
-  const handleDetailsChange = (value: string) => handleInputChange('recipeDetails', value);
 
   // Handle adding ingredients
   const handleAddIngredient = (ingredient: string) => {
@@ -260,90 +467,83 @@ const RecipeCreate: React.FC = () => {
     }
   };
 
-  // Clear errors efficiently with early return
-  const clearError = (field: keyof IFormErrors) => {
-    if (!errors[field]) return;
-    
-    const newErrors = {...errors};
-    delete newErrors[field];
-    setErrors(newErrors);
-    
-    // Show success message if form is now valid
-    if (Object.keys(newErrors).length === 0 && 
-        mealName.trim() && recipeDetails.trim() && ingredients.length > 0) {
-      setSuccessMessage('Recipe details are valid');
-      setTimeout(() => setSuccessMessage(''), 2000);
-    }
-  };
-
-  // Optimized preview mode toggle with efficient validation
+  // Toggle preview mode with validation
   const togglePreviewMode = () => {
-    // Exit preview mode: Clear all messages and return to editing
-    if (previewMode) {
-      setPreviewMode(false);
-      setSuccessMessage('');
-      return;
+    // Validate before letting users enter preview mode
+    if (!previewMode) {
+      const validationErrors = validateForm({
+        mealName,
+        ingredientsUsed: ingredients,
+        recipeDetails,
+        totalTimeMinutes,
+        macros,
+        showMacros,
+        difficulty,
+        servingSuggestions
+      });
+      
+      if (Object.keys(validationErrors).length > 0) {
+        setErrors(validationErrors);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return false;
+      }
     }
     
-    // Enter preview mode: Validate and show appropriate feedback
-    const validationErrors = validateForm({
-      mealName,
-      ingredients,
-      recipeDetails,
-      ingredientsUsed: ingredients,
-      prepTimeMinutes,
-      macros,
-      showMacros
-    });
+    setPreviewMode(!previewMode);
+    setErrors({});
     
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-    
-    // All valid: Enter preview mode with success notification
-    setPreviewMode(true);
-    setSuccessMessage('Preview mode activated');
-    setTimeout(() => setSuccessMessage(''), 1500);
+    return true;
   };
   
-  // Simplified validation with more concise logic
+  // Form validation with better error descriptions
   const validateForm = (data: {
     mealName: string;
-    ingredients?: string[];
     ingredientsUsed?: string[];
     recipeDetails: string;
-    prepTimeMinutes?: number;
+    totalTimeMinutes?: number;
     macros?: IMacros;
     showMacros?: boolean;
+    difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
+    servingSuggestions?: string;
   }) => {
     const newErrors: IFormErrors = {};
     
-    if (!data.mealName.trim()) newErrors.mealName = 'Recipe name is required';
-    if (!data.recipeDetails.trim()) newErrors.recipeDetails = 'Instructions are required';
-    
-    // Use either ingredientsUsed or ingredients
-    const ingredientsList = data.ingredientsUsed || data.ingredients || [];
-    if (ingredientsList.length === 0) {
-      newErrors.ingredientsUsed = 'At least one ingredient is required';
+    if (!data.mealName.trim()) {
+      newErrors.mealName = 'Please enter a name for your recipe';
     }
     
-    if (data.prepTimeMinutes !== undefined && data.prepTimeMinutes <= 0) {
-      newErrors.prepTimeMinutes = 'Preparation time must be positive';
+    if (!data.recipeDetails.trim()) {
+      newErrors.recipeDetails = 'Please add cooking instructions';
+    }
+    
+    if (!data.ingredientsUsed || data.ingredientsUsed.length === 0) {
+      newErrors.ingredientsUsed = 'Please add at least one ingredient';
+    }
+    
+    if (data.totalTimeMinutes !== undefined && data.totalTimeMinutes <= 0) {
+      newErrors.totalTimeMinutes = 'Cooking time must be a positive number';
     }
     
     return newErrors;
   };
 
-  // Updated handleSubmit function
+  // Optimized handle submit function with better error handling
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form before submission
-    const data = { mealName, ingredients, recipeDetails, prepTimeMinutes, macros, showMacros };
-    const validationErrors = validateForm(data);
+    // Create data object from form state
+    const data = { 
+      mealName, 
+      ingredientsUsed: ingredients, 
+      recipeDetails, 
+      totalTimeMinutes: showTime ? totalTimeMinutes : undefined,
+      macros: showMacros ? macros : undefined,
+      difficulty,
+      servingSuggestions: showServingSuggestions ? servingSuggestions : undefined
+    };
     
+    // Validate form data
+    const validationErrors = validateForm(data);
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -354,302 +554,384 @@ const RecipeCreate: React.FC = () => {
     setApiError(null);
     
     try {
-      // Create a request object matching what the backend expects
+      // Build request object with optional fields
       const requestObj = {
-        mealName,
-        ingredientsUsed: ingredients,
-        recipeDetails,
-        ...(prepTimeMinutes !== undefined && { prepTimeMinutes }),
-        ...(macros && Object.values(macros).some(v => v !== undefined) && { macros })
+        title: mealName,
+        ingredients: ingredients,
+        instructions: recipeDetails,
+        difficulty,
+        ...(showTime && totalTimeMinutes !== undefined && { totalTimeMinutes }),
+        ...(showMacros && macros && { 
+          macros: {
+            calories: macros.calories,
+            proteinGrams: macros.protein,
+            carbsGrams: macros.carbs, 
+            fatGrams: macros.fat
+          } 
+        }),
+        ...(showServingSuggestions && servingSuggestions && { servingSuggestions }),
+        ...(isEditing && existingImageUrl && !recipeImage && { imageUrl: existingImageUrl })
       };
       
-      // Create FormData with request and optional image
+      // Create FormData for image upload if needed
       const formData = new FormData();
-      formData.append('request', new Blob([JSON.stringify(requestObj)], { type: 'application/json' }));
+      formData.append('recipe', new Blob([JSON.stringify(requestObj)], { type: 'application/json' }));
       
-      // Add the image file if one is selected
       if (recipeImage) {
         formData.append('image', recipeImage);
       }
       
-      // Determine endpoint and method based on edit/create mode
-      const endpoint = isEditing ? `/v1/recipes/${id}` : '/v1/recipes/create-meal';
-      const method = isEditing ? 'put' : 'post';
-      
-      const response = await axios[method](endpoint, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      
-      // Show success and navigate
-      const newRecipeId = response.data.id || id;
-      setSuccessMessage(isEditing ? 'Recipe updated successfully!' : 'Recipe created successfully!');
-      
-      // Redirect to My Recipes page after a short delay
-      setTimeout(() => navigate('/recipe/my-recipes'), 1500);
-    } catch (err: any) {
-      console.error('Error submitting recipe:', err);
-      
-      let errorMessage = 'An error occurred while saving the recipe';
-      
-      if (err.response?.status === 401 || err.response?.status === 403) {
-        errorMessage = 'Error saving recipe. This might be due to a permission issue.';
-      } else if (err.message === 'Network Error' || !err.response) {
-        errorMessage = 'Unable to connect to the server. Please check your internet connection.';
-      } else if (err.response?.status === 413) {
-        errorMessage = 'The image you uploaded is too large. Please use an image smaller than 5MB.';
-      } else if (err.response?.data?.message || err.friendlyMessage) {
-        errorMessage = err.response?.data?.message || err.friendlyMessage;
+      // Save or update recipe
+      let response;
+      if (isEditing) {
+        response = recipeImage
+          ? await recipeService.updateRecipe(id!, formData)
+          : await recipeService.updateRecipeSimple(id!, requestObj);
+      } else {
+        response = await recipeService.createRecipe(formData);
       }
       
-      setApiError(errorMessage);
+      // Show success and navigate
+      setSuccessMessage(isEditing ? 'Recipe updated successfully!' : 'Recipe created successfully!');
+      setTimeout(() => navigate('/recipe/my-recipes'), 1500);
+    } catch (error: any) {
+      // Handle API errors with clear user feedback
+      if (error.response) {
+        if (error.response.status === 404) {
+          setApiError(`Could not find the recipe endpoint. Please try again later.`);
+        } else if (error.response.status === 500) {
+          setApiError(`Server error. Please try again later.`);
+        } else {
+          setApiError(`Error: ${error.response.data?.message || 'Could not save recipe'}`);
+        }
+      } else if (error.request) {
+        setApiError('No response from server. Please check your connection and try again.');
+      } else {
+        setApiError(`Error: ${error.message || 'Could not save recipe'}`);
+      }
+      
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Simplified notification component with consistent styling
-  const Notification = () => {
-    const hasErrors = Object.keys(errors).length > 0;
-    const hasSuccess = !!successMessage;
-    const hasApiError = !!apiError;
-    
-    // Common notification container styles
-    const containerStyles = "fixed right-0 top-4 w-80 min-h-[80px] rounded-l-lg shadow-lg overflow-hidden transition-transform duration-300 ease-in-out z-50";
-    
-    return (
-      <>
-        {/* Error notification */}
-        <div 
-          className={`${containerStyles} bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-lg ${hasErrors ? 'translate-x-0' : 'translate-x-full'}`}
-        >
-          <div className="p-4 border-l-4 border-red-500">
-            <div className="font-semibold text-red-600 dark:text-red-400 flex items-center mb-2">
-              <div className="p-1.5 bg-red-100 dark:bg-red-900/30 rounded-lg mr-2">
-                <FaExclamationCircle className="text-red-500" />
-              </div>
-              <span>Please Fix These Issues</span>
-            </div>
-            <div className="text-sm text-gray-700 dark:text-gray-300 ml-9">
-              {Object.entries(errors).map(([key, value]) => (
-                <p key={key} className="mb-1 flex items-center before:content-['•'] before:mr-2 before:text-red-400">{value}</p>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* API Error notification */}
-        {hasApiError && (
-          <div className={`${containerStyles} bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-lg translate-x-0 top-24`}>
-            <div className="p-4 border-l-4 border-red-500">
-              <div className="font-semibold text-red-600 dark:text-red-400 flex items-center mb-2">
-                <div className="p-1.5 bg-red-100 dark:bg-red-900/30 rounded-lg mr-2">
-                  <FaExclamationCircle className="text-red-500" />
-                </div>
-                <span>Server Error</span>
-              </div>
-              <div className="text-sm text-gray-700 dark:text-gray-300 ml-9">
-                {apiError}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Success notification */}
-        {hasSuccess && (
-          <div className={`${containerStyles} bg-white dark:bg-gray-800 border-r-4 border-green-500 translate-x-0 ${hasErrors ? 'top-24' : ''}`}>
-            <div className="p-3 flex flex-col">
-              <div className="font-semibold text-green-500 flex items-center">
-                <FaCheckCircle className="mr-2" />
-                <span>Success</span>
-              </div>
-              <div className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-                {successMessage}
-              </div>
-            </div>
-          </div>
-        )}
-      </>
-    );
-  };
-
-  // If in preview mode, render the recipe preview with improved UI
-  if (previewMode) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-indigo-900/20 p-4 sm:p-6 lg:p-8">
-        <div className="max-w-3xl mx-auto">
-          <Notification />
-          <div className="flex justify-between mb-6">
-            <button 
-              onClick={() => (setPreviewMode(false), setSuccessMessage(''), setErrors({}))}
-              className="group flex items-center text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-300 px-3 py-2 rounded-lg hover:bg-white/70 dark:hover:bg-gray-700"
+  return (
+    <div className="w-full max-w-7xl mx-auto px-6 py-10 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 min-h-screen">
+      {previewMode ? (
+        <div className="mb-8 max-w-4xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <button
+              onClick={() => setPreviewMode(false)}
+              className="flex items-center px-5 py-2.5 rounded-xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 transition-all duration-200 shadow-sm border border-gray-100 dark:border-gray-700"
             >
-              <FaEdit className="mr-2 group-hover:-translate-x-1 transition-transform" /> Back to Edit
+              <FaArrowLeft className="mr-2" />
+              Back to Edit
             </button>
-            <button 
-              onClick={handleSubmit} 
-              className="flex items-center bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 font-medium"
+            <h2 className="text-3xl font-semibold text-center text-gray-800 dark:text-white">Recipe Preview</h2>
+            <div className="w-24"></div>
+          </div>
+          
+          <RecipePreviewComponent
+            recipe={{
+              mealName,
+              ingredientsUsed: ingredients,
+              recipeDetails,
+              totalTimeMinutes: showTime ? totalTimeMinutes : undefined,
+              macros: showMacros ? {
+                calories: macros.calories,
+                proteinGrams: macros.protein,
+                carbsGrams: macros.carbs,
+                fatGrams: macros.fat
+              } : undefined,
+              difficulty,
+              imageUrl: existingImageUrl || undefined,
+              servingSuggestions: showServingSuggestions ? servingSuggestions : undefined
+            }}
+            previewImage={recipeImage || undefined}
+            isOwnRecipe={true}
+          />
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between mb-10 max-w-4xl mx-auto">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center px-5 py-2.5 rounded-xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 transition-all duration-200 shadow-sm border border-gray-100 dark:border-gray-700"
+            >
+              <FaArrowLeft className="mr-2" />
+              Back
+            </button>
+            <h1 className="text-3xl font-semibold text-center text-gray-800 dark:text-white">
+              {isEditing ? 'Edit Recipe' : 'Create New Recipe'}
+            </h1>
+            <div className="w-24"></div>
+          </div>
+
+          {/* Notifications */}
+          {(Object.keys(errors).length > 0 || apiError || successMessage) && (
+            <div className="max-w-4xl mx-auto">
+              {Object.keys(errors).length > 0 && (
+                <div
+                  className="mb-8 p-6 bg-red-50/90 dark:bg-red-900/20 rounded-2xl text-red-800 dark:text-red-200 animate-slide-in-right shadow-sm backdrop-blur-sm border border-red-100 dark:border-red-800/20"
+                  role="alert"
+                >
+                  <div className="flex items-start">
+                    <FaExclamationCircle className="h-6 w-6 mr-3 mt-0.5 text-red-500" />
+                    <div>
+                      <h3 className="text-base font-medium mb-2">Please fix these issues:</h3>
+                      <ul className="list-disc ml-5 space-y-1.5 text-sm">
+                        {Object.entries(errors).map(([field, message]) => (
+                          <li key={field}>{message}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {apiError && (
+                <div
+                  className="mb-8 p-6 bg-red-50/90 dark:bg-red-900/20 rounded-2xl text-red-800 dark:text-red-200 animate-slide-in-right shadow-sm backdrop-blur-sm border border-red-100 dark:border-red-800/20"
+                  role="alert"
+                >
+                  <div className="flex items-start">
+                    <FaExclamationCircle className="h-6 w-6 mr-3 mt-0.5 text-red-500" />
+                    <div>
+                      <p>{apiError}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {successMessage && (
+                <div
+                  className="mb-8 p-6 bg-green-50/90 dark:bg-green-900/20 rounded-2xl text-green-800 dark:text-green-200 animate-slide-in-right shadow-sm backdrop-blur-sm border border-green-100 dark:border-green-800/20"
+                  role="alert"
+                >
+                  <div className="flex items-center">
+                    <FaCheckCircle className="h-6 w-6 mr-3 text-green-500" />
+                    <p>{successMessage}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap justify-end gap-4 mb-8 sticky top-4 z-10 max-w-4xl mx-auto">
+            <button
+              type="button"
+              onClick={togglePreviewMode}
               disabled={isLoading}
+              className="flex items-center bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm text-gray-700 dark:text-gray-200 px-6 py-3 rounded-xl font-medium hover:bg-white dark:hover:bg-gray-800 transition-all duration-200 shadow-sm border border-gray-200 dark:border-gray-700"
+            >
+              <FaEye className="mr-2" />
+              Preview
+            </button>
+            <button
+              type="submit"
+              onClick={handleSubmit}
+              disabled={isLoading}
+              className="flex items-center bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-sm"
             >
               {isLoading ? (
-                <span className="flex items-center">
-                  <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                    />
-                  </svg>
+                <div className="flex items-center">
+                  <div className="h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   {isEditing ? 'Updating...' : 'Creating...'}
-                </span>
+                </div>
               ) : (
                 <>
-                  <FaCheck className="mr-2" /> {isEditing ? 'Update Recipe' : 'Create Recipe'}
+                  <FaCheck className="mr-2" />
+                  {isEditing ? 'Update Recipe' : 'Create Recipe'}
                 </>
               )}
             </button>
           </div>
-          
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 p-5 relative overflow-hidden">
-              <h2 className="text-xl text-white font-bold">Recipe Preview</h2>
-              <p className="text-blue-100 text-sm">Review your recipe before publishing</p>
-            </div>
-            <RecipePreview recipe={{
-              id: id,
-              mealName: recipeData.mealName,
-              imageUrl: recipeImage ? URL.createObjectURL(recipeImage) : recipeData.imageUrl,
-              ingredientsUsed: recipeData.ingredientsUsed,
-              recipeDetails: {
-                ingredientsList: recipeData.ingredientsUsed,
-                instructions: instructionsArray,
-                equipmentNeeded: [],
-                servingSuggestions: [],
-                nutritionalInformation: {
-                  calories: recipeData.macros ? recipeData.macros.calories.toString() : "0",
-                  protein: recipeData.macros ? recipeData.macros.protein.toString() : "0",
-                  carbohydrates: recipeData.macros ? recipeData.macros.carbohydrates.toString() : "0",
-                  fat: recipeData.macros ? recipeData.macros.fat.toString() : "0"
-                }
-              },
-              prepTimeMinutes: recipeData.prepTimeMinutes,
-              macros: recipeData.macros ? {
-                calories: recipeData.macros.calories,
-                protein: recipeData.macros.protein,
-                carbs: recipeData.macros.carbohydrates,
-                fat: recipeData.macros.fat
-              } : undefined
-            }} />
-          </div>
-        </div>
-      </div>
-    );
-  }
 
-  // For edit mode UI
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-indigo-900/20 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <button 
-            onClick={() => navigate('/recipes')}
-            className="group flex items-center text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-300 px-3 py-2 rounded-lg hover:bg-white/70 dark:hover:bg-gray-700"
-          >
-            <FaArrowLeft className="mr-2 group-hover:-translate-x-1 transition-transform" /> Back to All Recipes
-          </button>
-          
-          <Link 
-            to="/favorites"
-            className="flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-800/30 transition-colors border border-red-200 dark:border-red-800/50"
-          >
-            <FaHeart className="text-red-500" />
-            <span className="font-medium">My Favorites</span>
-          </Link>
-        </div>
-        <Notification />
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 p-8 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mt-12 -mr-12 z-0"></div>
-            <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/10 rounded-full -mb-10 -ml-10 z-0"></div>
-            <div className="relative z-10 text-white">
-              <div className="flex items-center">
-                <div className="p-3 bg-white/20 rounded-xl">
-                  <FaUtensils className="text-3xl text-white" />
-                </div>
-                <h1 className="text-2xl md:text-3xl font-bold ml-4">{isEditing ? 'Edit Recipe' : 'Create New Recipe'}</h1>
-              </div>
-              <p className="text-blue-100 mt-3 ml-1 max-w-lg">Share your culinary masterpiece with detailed instructions and beautiful images</p>
-            </div>
-          </div>
-          
-          <div className="p-8">
-            {/* Pro tip */}
-            {showMacros && (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-l-4 border-blue-500 p-5 mb-8 rounded-lg shadow-sm" data-aos="fade-in">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-start">
-                    <div className="p-2 bg-blue-100 dark:bg-blue-800/30 rounded-lg mr-3 flex-shrink-0">
-                      <FaRegLightbulb className="text-blue-500 dark:text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="font-semibold flex items-center text-blue-700 dark:text-blue-300">Pro Tip</p>
-                      <p className="text-sm text-blue-600 dark:text-blue-300/90 mt-1">Fill in all details for a complete recipe. Add nutritional information to help users with dietary needs. The more details you provide, the more valuable your recipe will be!</p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setShowMacros(false)}
-                    className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 p-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-800/30 transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {/* Error alert */}
-          {apiError && (
-              <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-300 p-4 mb-8 rounded-lg shadow-sm" data-aos="fade-in">
-                <p className="font-medium flex items-center"><FaInfoCircle className="mr-2" /> Error</p>
-                <p className="dark:text-red-300/90">{apiError}</p>
-            </div>
-          )}
-          
-            <form className="space-y-8" onSubmit={(e) => e.preventDefault()}>
-              {/* Recipe Name */}
-              <FormSection 
-                icon={<FaUtensils className="text-blue-500 dark:text-blue-400" />} 
-                title="Recipe Name" 
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <div className="lg:col-span-2 space-y-8">
+              {/* Basic Info */}
+              <FormSection
+                icon={<FaUtensils className="text-blue-500 dark:text-blue-400 text-xl" />}
+                title="Basic Information"
                 color="blue"
               >
-            <TextInput
+                <TextInput
                   label="Recipe Name"
-              id="mealName"
-              value={mealName}
+                  id="mealName"
+                  value={mealName}
                   setValue={setMealName}
+                  placeholder="Enter the name of your recipe"
                   error={errors.mealName}
-                  placeholder="e.g. Creamy Garlic Butter Tuscan Shrimp"
                   onErrorClear={() => clearError('mealName')}
                 />
+                
+                {/* Time Field - Single Total Time */}
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                      Total Cooking Time
+                    </label>
+                    <div>
+                      <label className="inline-flex items-center cursor-pointer">
+                        <span className="mr-3 text-sm text-gray-700 dark:text-gray-300">
+                          {showTime ? 'Remove' : 'Add'}
+                        </span>
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={showTime}
+                            onChange={() => setShowTime(!showTime)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-12 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500 dark:peer-checked:bg-blue-600"></div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  {showTime && (
+                    <div className="border-0 rounded-xl p-5 bg-blue-50/50 dark:bg-blue-900/10 shadow-sm">
+                      <div className="flex items-center">
+                        <FaClock className="text-blue-500 mr-3 text-xl" />
+                        <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mr-3">
+                          Total Time:
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={totalTimeMinutes || ''}
+                          onChange={(e) => setTotalTimeMinutes(parseInt(e.target.value) || undefined)}
+                          className="w-24 px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                          placeholder="mins"
+                        />
+                        <span className="ml-3 text-sm text-gray-600 dark:text-gray-400">minutes</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </FormSection>
-              
-              {/* Image Upload */}
+
+              {/* Ingredients */}
+              <FormSection
+                icon={<FaListUl className="text-green-500 dark:text-green-400 text-xl" />}
+                title="Ingredients"
+                color="green"
+              >
+                <div className="p-1">
+                  <CreateIngredientsInput
+                    ingredientsUsed={ingredients}
+                    setIngredientsUsed={setIngredients}
+                    onAddIngredient={handleAddIngredient}
+                    onRemoveIngredient={handleRemoveIngredient}
+                    error={errors.ingredientsUsed}
+                  />
+                </div>
+              </FormSection>
+
+              {/* Instructions */}
+              <FormSection
+                icon={<FaRegLightbulb className="text-amber-500 dark:text-amber-400 text-xl" />}
+                title="Cooking Instructions"
+                color="amber"
+              >
+                <TextArea
+                  label="Recipe Instructions"
+                  id="recipeDetails"
+                  value={recipeDetails}
+                  setValue={setRecipeDetails}
+                  placeholder="Provide step-by-step instructions for your recipe. Each instruction on a new line."
+                  error={errors.recipeDetails}
+                  onErrorClear={() => clearError('recipeDetails')}
+                />
+                
+                {/* Add instruction count and estimator */}
+                {instructionsArray.length > 0 && (
+                  <div className="mt-3 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 p-3 bg-amber-50 dark:bg-amber-900/10 rounded-xl">
+                    <span className="font-medium">
+                      {instructionsArray.length} {instructionsArray.length === 1 ? 'step' : 'steps'}
+                    </span>
+                    <span className="text-amber-600 dark:text-amber-400 font-medium">
+                      Estimated cooking time: ~{Math.max(10, instructionsArray.length * 5)} minutes
+                    </span>
+                  </div>
+                )}
+              </FormSection>
+
+              {/* Serving Suggestions */}
               <FormSection 
-                icon={<FaImage className="text-indigo-500 dark:text-indigo-400" />} 
+                icon={<FaRegLightbulb className="text-teal-500 dark:text-teal-400 text-xl" />} 
+                title="Serving Suggestions" 
+                color="teal"
+              >
+                <div className="flex items-center justify-between mb-5">
+                  <p className="text-base text-gray-600 dark:text-gray-400">
+                    Add tips for serving or pairing your recipe
+                  </p>
+                  <div>
+                    <label className="inline-flex items-center cursor-pointer">
+                      <span className="mr-3 text-sm text-gray-700 dark:text-gray-300">
+                        {showServingSuggestions ? 'Remove' : 'Add'}
+                      </span>
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={showServingSuggestions}
+                          onChange={() => setShowServingSuggestions(!showServingSuggestions)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-12 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500 dark:peer-checked:bg-teal-600"></div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+                
+                {showServingSuggestions && (
+                  <div className="border-0 rounded-xl p-5 bg-teal-50/50 dark:bg-teal-900/10 shadow-sm">
+                    <textarea
+                      value={servingSuggestions}
+                      onChange={(e) => setServingSuggestions(e.target.value)}
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                      placeholder="Add serving suggestions or chef's tips (e.g., 'Serve with a side of garlic bread')"
+                      rows={3}
+                    />
+                  </div>
+                )}
+              </FormSection>
+            </div>
+
+            <div className="space-y-8">
+              {/* Recipe Image */}
+              <FormSection 
+                icon={<FaImage className="text-indigo-500 dark:text-indigo-400 text-xl" />} 
                 title="Recipe Image" 
                 color="indigo"
-                delay={50}
               >
                 <div className="w-full">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
-                    Upload Recipe Image
+                  <label className="block text-base font-medium text-gray-700 dark:text-gray-200 mb-3">
+                    {existingImageUrl ? "Current Image (Upload new to replace)" : "Upload Recipe Image"}
                   </label>
+                  {existingImageUrl && !recipeImage && (
+                    <div className="mb-6 flex flex-col items-center">
+                      <div className="h-48 w-full max-w-sm overflow-hidden rounded-xl shadow-md mb-3 relative group">
+                        <img 
+                          src={existingImageUrl} 
+                          alt="Current recipe" 
+                          className="h-full w-full object-cover transform group-hover:scale-105 transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      </div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Current image
+                      </p>
+                    </div>
+                  )}
                   <div 
-                    className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-xl
-                      border-gray-300 dark:border-gray-600
-                      hover:border-indigo-500 dark:hover:border-indigo-400 transition-colors duration-200 relative"
+                    className="mt-2 flex justify-center px-6 pt-6 pb-6 border-2 border-dashed rounded-xl
+                      border-indigo-200 dark:border-indigo-700
+                      hover:border-indigo-500 dark:hover:border-indigo-400 transition-all duration-200 relative
+                      bg-indigo-50/50 dark:bg-indigo-900/10"
                   >
                     <input
                       type="file"
@@ -657,11 +939,9 @@ const RecipeCreate: React.FC = () => {
                       onChange={(e) => {
                         if (e.target.files && e.target.files.length > 0) {
                           const file = e.target.files[0];
-                          // Check if file size is less than 5MB
                           if (file.size <= 5 * 1024 * 1024) {
                             setRecipeImage(file);
                           } else {
-                            // Show file size error
                             setApiError("Image size must be less than 5MB");
                           }
                         }
@@ -671,12 +951,20 @@ const RecipeCreate: React.FC = () => {
                     
                     {recipeImage ? (
                       <div className="flex flex-col items-center py-2">
-                        <img 
-                          src={URL.createObjectURL(recipeImage)} 
-                          alt="Recipe preview" 
-                          className="h-40 object-cover rounded-lg shadow-md mb-3" 
-                        />
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <div className="h-48 w-full max-w-sm overflow-hidden rounded-xl shadow-md mb-4 relative">
+                          <img 
+                            src={URL.createObjectURL(recipeImage)} 
+                            alt="Recipe preview" 
+                            className="h-full w-full object-cover"
+                            onLoad={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              if (target.src.startsWith('blob:')) {
+                                URL.revokeObjectURL(target.src);
+                              }
+                            }}
+                          />
+                        </div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
                           {recipeImage.name} ({(recipeImage.size / 1024 / 1024).toFixed(2)} MB)
                         </p>
                         <button
@@ -685,17 +973,19 @@ const RecipeCreate: React.FC = () => {
                             e.preventDefault();
                             setRecipeImage(null);
                           }}
-                          className="mt-2 px-3 py-1 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 border border-red-300 dark:border-red-600 hover:border-red-500 dark:hover:border-red-500 rounded-full transition-colors"
+                          className="mt-2 px-5 py-2 text-sm text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-xl transition-all duration-200 shadow-sm"
                         >
                           Remove
                         </button>
                       </div>
                     ) : (
-                      <div className="space-y-1 text-center py-8">
-                        <FaUpload className="mx-auto h-12 w-12 text-gray-400" />
+                      <div className="space-y-2 text-center py-8">
+                        <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-full h-16 w-16 flex items-center justify-center mx-auto">
+                          <FaUpload className="h-8 w-8 text-indigo-500 dark:text-indigo-400" />
+                        </div>
                         <div className="flex flex-col items-center text-sm text-gray-600 dark:text-gray-400">
-                          <p className="mt-1">Click to select an image</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <p className="mt-2 text-base font-medium text-indigo-600 dark:text-indigo-400">Click to {existingImageUrl ? "replace" : "select"} an image</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                             PNG, JPG, GIF up to 5MB
                           </p>
                         </div>
@@ -705,161 +995,125 @@ const RecipeCreate: React.FC = () => {
                 </div>
               </FormSection>
               
-              {/* Preparation Time */}
+              {/* Nutritional Information */}
               <FormSection 
-                icon={<FaRegLightbulb className="text-amber-500 dark:text-amber-400" />} 
-                title="Preparation Time" 
-                color="amber"
-                delay={80}
+                icon={<FaChartBar className="text-purple-500 dark:text-purple-400 text-xl" />} 
+                title="Nutritional Information" 
+                color="purple"
               >
-                <div>
-                  <label 
-                    htmlFor="prepTimeMinutes" 
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"
-                  >
-                    Preparation Time (minutes)
-                  </label>
-                  <input
-                    id="prepTimeMinutes"
-                    type="number"
-                    min="1"
-                    value={prepTimeMinutes || ''}
-                    onChange={(e) => {
-                      const value = e.target.value ? parseInt(e.target.value) : undefined;
-                      setPrepTimeMinutes(value);
-                      if (errors.prepTimeMinutes) clearError('prepTimeMinutes');
-                    }}
-                    className={`w-full px-4 py-3 rounded-lg border shadow-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all duration-200
-                      ${errors.prepTimeMinutes ? 'border-red-500 focus:ring-red-400' : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'}
-                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-300`}
-                    placeholder="e.g. 30"
-                  />
-                  {errors.prepTimeMinutes && (
-                    <p className="mt-2 text-sm text-red-500 dark:text-red-400">
-                      {errors.prepTimeMinutes}
-                    </p>
-                  )}
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
-                    Enter the approximate time it takes to prepare this recipe
+                <MacrosInput
+                  macros={macros}
+                  setMacros={setMacros}
+                  showMacros={showMacros}
+                  setShowMacros={setShowMacros}
+                />
+              </FormSection>
+
+              {/* Recipe Difficulty */}
+              <FormSection 
+                icon={<FaInfoCircle className="text-blue-500 dark:text-blue-400 text-xl" />} 
+                title="Recipe Difficulty" 
+                color="blue"
+              >
+                <div className="mb-4">
+                  <p className="text-base text-gray-600 dark:text-gray-400 mb-6">
+                    Select the difficulty level:
                   </p>
+                  <div className="grid grid-cols-3 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setDifficulty('EASY')}
+                      className={`px-4 py-4 rounded-xl text-center font-medium transition-all duration-200 ${
+                        difficulty === 'EASY'
+                          ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-md scale-105'
+                          : 'bg-white dark:bg-gray-800 text-green-700 dark:text-green-400 border border-gray-200 dark:border-gray-700 hover:bg-green-50 dark:hover:bg-green-900/20'
+                      }`}
+                    >
+                      Easy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDifficulty('MEDIUM')}
+                      className={`px-4 py-4 rounded-xl text-center font-medium transition-all duration-200 ${
+                        difficulty === 'MEDIUM'
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md scale-105'
+                          : 'bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-400 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                      }`}
+                    >
+                      Medium
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDifficulty('HARD')}
+                      className={`px-4 py-4 rounded-xl text-center font-medium transition-all duration-200 ${
+                        difficulty === 'HARD'
+                          ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-md scale-105'
+                          : 'bg-white dark:bg-gray-800 text-red-700 dark:text-red-400 border border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/20'
+                      }`}
+                    >
+                      Hard
+                    </button>
+                  </div>
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-4 p-5 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl">
+                  <ul className="space-y-2">
+                    <li className="flex items-start">
+                      <span className="text-green-500 mr-2 mt-1">•</span>
+                      <span><strong>Easy:</strong> Simple recipes with basic techniques</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-blue-500 mr-2 mt-1">•</span>
+                      <span><strong>Medium:</strong> More involved recipes with several steps</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-red-500 mr-2 mt-1">•</span>
+                      <span><strong>Hard:</strong> Complex recipes requiring advanced skills</span>
+                    </li>
+                  </ul>
                 </div>
               </FormSection>
               
-              {/* Ingredients */}
+              {/* Recipe Tips */}
               <FormSection 
-                icon={<FaLeaf className="text-green-500 dark:text-green-400" />} 
-                title="Ingredients" 
-                color="green"
-                delay={100}
+                icon={<FaInfoCircle className="text-teal-500 dark:text-teal-400 text-xl" />} 
+                title="Recipe Tips" 
+                color="teal"
               >
-            <CreateIngredientsInput
-              ingredientsUsed={ingredients}
-                  setIngredientsUsed={setIngredients}
-              error={errors.ingredientsUsed}
-            />
+                <div className="text-sm text-gray-600 dark:text-gray-400 space-y-5 p-5 bg-teal-50/50 dark:bg-teal-900/10 rounded-xl">
+                  <div className="flex items-start gap-3 group">
+                    <div className="p-2.5 bg-white dark:bg-gray-800 rounded-full shadow-sm group-hover:shadow-md group-hover:scale-105 transition-all duration-200">
+                      <FaCheck className="text-teal-500" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-teal-600 dark:text-teal-400 mb-1 text-base">Clear Instructions</p>
+                      <p>Write your steps in the order they should be performed.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3 group">
+                    <div className="p-2.5 bg-white dark:bg-gray-800 rounded-full shadow-sm group-hover:shadow-md group-hover:scale-105 transition-all duration-200">
+                      <FaCheck className="text-teal-500" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-teal-600 dark:text-teal-400 mb-1 text-base">Be Specific</p>
+                      <p>Include amounts, cooking times, and temperatures where needed.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3 group">
+                    <div className="p-2.5 bg-white dark:bg-gray-800 rounded-full shadow-sm group-hover:shadow-md group-hover:scale-105 transition-all duration-200">
+                      <FaCheck className="text-teal-500" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-teal-600 dark:text-teal-400 mb-1 text-base">Add Context</p>
+                      <p>Include helpful tips like "until golden brown" or "until tender."</p>
+                    </div>
+                  </div>
+                </div>
               </FormSection>
-              
-              {/* Recipe Details */}
-              <FormSection 
-                icon={<FaListUl className="text-amber-500 dark:text-amber-400" />} 
-                title="Instructions" 
-                color="amber"
-                delay={150}
-              >
-            <TextArea
-                  label="Recipe Instructions"
-              id="recipeDetails"
-              value={recipeDetails}
-                  setValue={setRecipeDetails}
-              error={errors.recipeDetails}
-                  placeholder="Describe the preparation steps, one per line..."
-                  onErrorClear={() => clearError('recipeDetails')}
-                />
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
-                  Instructions will be automatically numbered. Each new line represents a new step.
-                </p>
-              </FormSection>
-              
-              {/* Macros Section */}
-              <FormSection 
-                icon={<FaChartBar className="text-blue-500 dark:text-blue-400" />} 
-                title="Nutritional Information" 
-                color="blue"
-                delay={250}
-              >
-            <MacrosInput
-              macros={macros}
-              setMacros={setMacros}
-              showMacros={showMacros}
-              setShowMacros={setShowMacros}
-            />
-              </FormSection>
-              
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 pt-6" data-aos="fade-up" data-aos-delay="300">
-                <button
-                  type="button"
-                  onClick={togglePreviewMode}
-                  className="flex-1 py-3 px-5 bg-gradient-to-r from-purple-500 to-violet-600 text-white font-medium rounded-xl hover:from-purple-600 hover:to-violet-700 transition shadow-md hover:shadow-lg flex items-center justify-center transform hover:-translate-y-0.5"
-                >
-                  {previewMode ? <FaEdit className="mr-2" /> : <FaEye className="mr-2" />} 
-                  {previewMode ? 'Return to Edit' : 'Preview Recipe'}
-                </button>
-                
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={isLoading}
-                  className="flex-1 py-3 px-5 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-medium rounded-xl hover:from-emerald-600 hover:to-green-700 transition shadow-md hover:shadow-lg flex items-center justify-center transform hover:-translate-y-0.5"
-            >
-              {isLoading ? (
-                <span className="flex items-center">
-                  <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                    />
-                  </svg>
-                  {isEditing ? 'Updating...' : 'Creating...'}
-                </span>
-              ) : (
-                    <>
-                      <FaCheck className="mr-2" /> {isEditing ? 'Update Recipe' : 'Create Recipe'}
-                    </>
-              )}
-            </button>
-              </div>
-          </form>
-          </div>
-        </div>
-      </div>
-      
-      {/* Success Modal - remove data-aos from here */}
-      {successMessage && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div 
-            className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl max-w-md w-full mx-4 transform animate-[scale-in_0.3s_ease-out]"
-          >
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
-                <FaCheckCircle className="w-8 h-8 text-green-500 dark:text-green-400" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{successMessage}</h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-6">Your recipe has been successfully {isEditing ? 'updated' : 'created'}!</p>
-              <button
-                onClick={() => {
-                  setSuccessMessage('');
-                  navigate('/recipes');
-                }}
-                className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-medium rounded-xl hover:from-emerald-600 hover:to-green-700 transition shadow-md hover:shadow-lg"
-              >
-                View All Recipes
-              </button>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

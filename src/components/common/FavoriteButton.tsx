@@ -38,10 +38,14 @@ const FavoriteButton: React.FC<FavoriteButtonProps> = ({
       const checkFavorite = async () => {
         try {
           const status = await favoriteService.checkFavorite(recipeId);
-          setIsFavorite(status);
+          // Ensure we always set a boolean value, even if API returns undefined
+          setIsFavorite(status === true);
           setIsChecked(true);
+          console.log(`[FavoriteButton] Recipe ${recipeId} favorite status: ${status}`);
         } catch (error) {
           console.error('Failed to check favorite status:', error);
+          setIsChecked(true); // Mark as checked even on error to prevent endless retry
+          setIsFavorite(false); // Default to false on error
         }
       };
       
@@ -70,11 +74,12 @@ const FavoriteButton: React.FC<FavoriteButtonProps> = ({
       // Call API to update server state
       const result = await favoriteService.toggleFavorite(recipeId);
       
-      // Force update state to match server result
-      setIsFavorite(result);
+      // Force update state to match server result, ensuring we always use a boolean
+      setIsFavorite(result === true);
+      console.log(`[FavoriteButton] Toggle result for ${recipeId}: ${result}`);
       
       // Show toast notification
-      if (result) {
+      if (result === true) {
         showToast('Recipe added to favorites!', 'favorite');
       } else {
         showToast('Recipe removed from favorites', 'success');

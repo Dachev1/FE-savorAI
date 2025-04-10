@@ -12,14 +12,27 @@ const MacrosInput: React.FC<MacrosInputProps> = ({
   macros,
   setMacros,
   showMacros,
-  setShowMacros,
+  setShowMacros
 }) => {
   const handleMacrosChange = (field: keyof IMacros, value: string) => {
-    const numValue = value === '' ? undefined : parseFloat(value);
+    // Allow empty values for all fields
+    if (value === '') {
+      setMacros((prev) => ({
+        ...prev,
+        [field]: undefined,
+      }));
+      return;
+    }
+    
+    // For non-empty values
+    const numValue = parseFloat(value);
+    
+    // Ensure we don't store negative values
+    const finalValue = !isNaN(numValue) && numValue < 0 ? 0 : numValue;
     
     setMacros((prev) => ({
-      ...(prev || { calories: 0, protein: 0, carbohydrates: 0, fat: 0 }),
-      [field]: numValue || 0,
+      ...(prev || {}),
+      [field]: !isNaN(finalValue) ? finalValue : undefined,
     }));
   };
 
@@ -55,6 +68,7 @@ const MacrosInput: React.FC<MacrosInputProps> = ({
             </label>
             <input
               type="number"
+              min="0"
               value={macros?.calories ?? ''}
               onChange={(e) => handleMacrosChange('calories', e.target.value)}
               className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-300"
@@ -67,6 +81,7 @@ const MacrosInput: React.FC<MacrosInputProps> = ({
             </label>
             <input
               type="number"
+              min="0"
               step="0.1"
               value={macros?.protein ?? ''}
               onChange={(e) => handleMacrosChange('protein', e.target.value)}
@@ -76,13 +91,14 @@ const MacrosInput: React.FC<MacrosInputProps> = ({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Carbohydrates (g)
+              Carbs (g)
             </label>
             <input
               type="number"
+              min="0"
               step="0.1"
-              value={macros?.carbohydrates ?? ''}
-              onChange={(e) => handleMacrosChange('carbohydrates', e.target.value)}
+              value={macros?.carbs ?? ''}
+              onChange={(e) => handleMacrosChange('carbs', e.target.value)}
               className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-300"
               placeholder="e.g. 30.2"
             />
@@ -93,6 +109,7 @@ const MacrosInput: React.FC<MacrosInputProps> = ({
             </label>
             <input
               type="number"
+              min="0"
               step="0.1"
               value={macros?.fat ?? ''}
               onChange={(e) => handleMacrosChange('fat', e.target.value)}

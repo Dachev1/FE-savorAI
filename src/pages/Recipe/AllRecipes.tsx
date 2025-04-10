@@ -4,11 +4,12 @@ import axios from '../../api/axiosConfig';
 import { useAuth } from '../../context';
 import { LoadingSpinner } from '../../components/common';
 import { 
-  FaSearch, FaThumbsUp, FaThumbsDown, FaComment, 
+  FaSearch, FaComment, 
   FaHeart, FaRegHeart, FaUserCircle, FaClock
 } from 'react-icons/fa';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
+import VoteButtons from '../../components/recipe/VoteButtons';
 
 // Recipe interface with voting and favorite functionality
 interface Recipe {
@@ -23,7 +24,7 @@ interface Recipe {
   commentCount?: number;
   isFavorite?: boolean;
   hasVoted?: boolean;
-  userVote?: 'up' | 'down' | null;
+  userVote?: 'UPVOTE' | 'DOWNVOTE' | null;
   prepTimeMinutes?: number;
   createdAt?: string;
 }
@@ -35,7 +36,6 @@ const AllRecipes: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [votingInProgress, setVotingInProgress] = useState<string | null>(null);
   const [favoriteInProgress, setFavoriteInProgress] = useState<string | null>(null);
 
   // Initialize animations
@@ -115,47 +115,21 @@ const AllRecipes: React.FC = () => {
     }
   }, [isAuthenticated, navigate, favoriteInProgress, recipes]);
 
-  // Handle voting
-  const handleVote = useCallback(async (recipeId: string, voteType: 'up' | 'down', event: React.MouseEvent) => {
-    event.stopPropagation();
-    if (!isAuthenticated) {
-      navigate('/signin');
-      return;
-    }
-
-    // Check if this is the user's own recipe
-    const recipe = recipes.find(r => r.id === recipeId);
-    if (recipe?.authorId === user?.id) {
-      // Prevent voting on user's own recipes
-      return;
-    }
-
-    if (votingInProgress === recipeId) return;
-    setVotingInProgress(recipeId);
-
-    try {
-      const response = await axios.post(`/v1/recipes/${recipeId}/vote`, { voteType });
-      const updatedRecipe = response.data;
-      
-      // Update the recipes state with the new vote counts
-      setRecipes(prevRecipes => 
-        prevRecipes.map(recipe => 
-          recipe.id === recipeId 
-            ? { 
-                ...recipe, 
-                upvotes: updatedRecipe.upvotes, 
-                downvotes: updatedRecipe.downvotes,
-                userVote: updatedRecipe.userVote 
-              } 
-            : recipe
-        )
-      );
-    } catch (error) {
-      console.error('Error voting:', error);
-    } finally {
-      setVotingInProgress(null);
-    }
-  }, [isAuthenticated, navigate, recipes, user, votingInProgress]);
+  // Handle vote changes
+  const handleVoteChange = useCallback((recipeId: string, updatedVote: { upvotes: number, downvotes: number, userVote: 'UPVOTE' | 'DOWNVOTE' | null }) => {
+    setRecipes(prevRecipes => 
+      prevRecipes.map(recipe => 
+        recipe.id === recipeId 
+          ? { 
+              ...recipe, 
+              upvotes: updatedVote.upvotes, 
+              downvotes: updatedVote.downvotes,
+              userVote: updatedVote.userVote 
+            } 
+          : recipe
+      )
+    );
+  }, []);
 
   // Filter recipes based on search term
   const filteredRecipes = recipes.filter(recipe => 
@@ -278,8 +252,14 @@ const AllRecipes: React.FC = () => {
                           <img 
                             src={recipe.imageUrl} 
                             alt={recipe.mealName} 
-                            className="w-full h-full object-cover transition-transform hover:scale-110 duration-500"
+                            className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.onerror = null; // Prevent infinite loop
+                              target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop";
+                            }}
                           />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
                         </div>
                       ) : (
                         <div 
@@ -345,35 +325,17 @@ const AllRecipes: React.FC = () => {
                         
                         {/* Recipe actions */}
                         <div className="flex items-center justify-between mt-4">
-                          {/* Voting and comments */}
                           <div className="flex items-center space-x-4">
-                            {/* Upvote */}
-                            <button 
-                              onClick={(e) => handleVote(recipe.id, 'up', e)}
-                              disabled={votingInProgress === recipe.id || recipe.authorId === user?.id}
-                              className={`flex items-center space-x-1 px-2 py-1 rounded-lg transition-colors ${
-                                recipe.authorId === user?.id ? 'cursor-not-allowed opacity-50' :
-                                recipe.userVote === 'up' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' : 
-                                'hover:bg-gray-100 dark:hover:bg-gray-700'
-                              }`}
-                            >
-                              <FaThumbsUp className={recipe.userVote === 'up' ? 'text-green-500' : ''} />
-                              <span>{recipe.upvotes || 0}</span>
-                            </button>
-                            
-                            {/* Downvote */}
-                            <button 
-                              onClick={(e) => handleVote(recipe.id, 'down', e)}
-                              disabled={votingInProgress === recipe.id || recipe.authorId === user?.id}
-                              className={`flex items-center space-x-1 px-2 py-1 rounded-lg transition-colors ${
-                                recipe.authorId === user?.id ? 'cursor-not-allowed opacity-50' :
-                                recipe.userVote === 'down' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 
-                                'hover:bg-gray-100 dark:hover:bg-gray-700'
-                              }`}
-                            >
-                              <FaThumbsDown className={recipe.userVote === 'down' ? 'text-red-500' : ''} />
-                              <span>{recipe.downvotes || 0}</span>
-                            </button>
+                            {/* Vote buttons */}
+                            <VoteButtons
+                              recipeId={recipe.id}
+                              authorId={recipe.authorId || ''}
+                              upvotes={recipe.upvotes}
+                              downvotes={recipe.downvotes}
+                              userVote={recipe.userVote}
+                              size="small"
+                              onVoteChange={(updatedVote) => handleVoteChange(recipe.id, updatedVote)}
+                            />
                             
                             {/* Comments */}
                             <button 

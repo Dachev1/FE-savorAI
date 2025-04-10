@@ -27,6 +27,8 @@ interface RecipeResponse {
   recipeDetails: RecipeDetails;
   imageUrl: string;
   aiGenerated?: boolean;
+  cookingTimeMinutes?: number;
+  difficulty?: string;
 }
 
 type GeneratedMealResponse = RecipeResponse;
@@ -41,6 +43,27 @@ const RecipeGenerator: React.FC = () => {
   const [isFavorite, setIsFavorite] = useState(false);
   const { showToast } = useToast();
   const { isAuthenticated } = useAuth();
+
+  // Helper to ensure consistency with cooking time and difficulty
+  const ensureRecipeMetadata = useCallback((recipe: GeneratedMealResponse): GeneratedMealResponse => {
+    // Deep copy to avoid mutation issues
+    const updatedRecipe = { ...recipe };
+    
+    // Only generate cooking time if it doesn't exist or is invalid
+    if (!updatedRecipe.cookingTimeMinutes || updatedRecipe.cookingTimeMinutes <= 0) {
+      const randomCookingTime = Math.floor(Math.random() * 30) + 15; // 15-45 minutes
+      updatedRecipe.cookingTimeMinutes = randomCookingTime;
+    }
+    
+    // Set difficulty level if not provided - 70% EASY, 20% MEDIUM, 10% HARD
+    if (!updatedRecipe.difficulty) {
+      const random = Math.random();
+      const randomDifficulty = random < 0.7 ? 'EASY' : random < 0.9 ? 'MEDIUM' : 'HARD';
+      updatedRecipe.difficulty = randomDifficulty;
+    }
+    
+    return updatedRecipe;
+  }, []);
 
   // -----------------------------
   // Effects
@@ -60,10 +83,19 @@ const RecipeGenerator: React.FC = () => {
     const checkFavoriteStatus = async () => {
       try {
         const recipeId = recipe.id as string;
-        const isFav = await favoriteService.checkFavorite(recipeId);
-        setIsFavorite(isFav);
+        console.log('[DEBUG-GENERATOR] Checking favorite status for:', recipeId);
+        
+        const favoriteStatus = await favoriteService.checkFavorite(recipeId);
+        console.log('[DEBUG-GENERATOR] Raw favorite status result:', favoriteStatus, typeof favoriteStatus);
+        
+        // Force boolean conversion
+        const boolStatus = favoriteStatus === true;
+        console.log('[DEBUG-GENERATOR] Converted to boolean:', boolStatus);
+        
+        setIsFavorite(boolStatus);
       } catch (error) {
-        console.error('Error checking favorite status:', error);
+        console.error('[DEBUG-GENERATOR] Error checking favorite status:', error);
+        setIsFavorite(false); // Default to not favorite on error
       }
     };
 
@@ -110,56 +142,73 @@ Fat: ${details.nutritionalInformation.fat}
 
   const handleToggleFavorite = useCallback(async (): Promise<boolean> => {
     if (!recipe) {
+      console.log('[DEBUG-GENERATOR] Toggle favorite: No recipe to save');
       showToast('No recipe to save', 'error');
       return false;
     }
 
+    // Ensure recipe has proper metadata before saving
+    const recipeToSave = ensureRecipeMetadata({...recipe});
+    
+    // Update recipe state if metadata was added or changed
+    if (recipeToSave.cookingTimeMinutes !== recipe.cookingTimeMinutes || 
+        recipeToSave.difficulty !== recipe.difficulty) {
+      setRecipe(recipeToSave);
+    }
+
     // Calculate new state
     const newFavoriteState = !isFavorite;
+    console.log('[DEBUG-GENERATOR] Toggle favorite: Current:', isFavorite, 'New target state:', newFavoriteState);
     
     // IMPORTANT: Update UI state FIRST for instant feedback
     setIsFavorite(newFavoriteState);
     
     try {
       // New recipe without ID - needs to be saved first
-      if (!recipe.id) {
+      if (!recipeToSave.id) {
+        console.log('[DEBUG-GENERATOR] Toggle favorite: Recipe has no ID, saving first');
         try {
-          const recipeId = await favoriteService.saveGeneratedRecipe(recipe);
+          const recipeId = await favoriteService.saveGeneratedRecipe(recipeToSave);
+          console.log('[DEBUG-GENERATOR] Toggle favorite: Recipe saved with ID:', recipeId);
           setRecipe(prev => prev ? {...prev, id: recipeId} : null);
           showToast('Recipe added to favorites!', 'favorite');
           return true;
         } catch (error) {
-          console.error('Error saving recipe:', error);
+          console.error('[DEBUG-GENERATOR] Toggle favorite: Error saving recipe:', error);
           // Revert UI on error
           setIsFavorite(false);
-          showToast('Failed to save recipe', 'error');
+          showToast('Database error - unable to save recipe', 'error');
           return false;
         }
       }
       
       // AI-generated recipe being removed
-      if (recipe.aiGenerated && newFavoriteState === false) {
+      if (recipeToSave.aiGenerated && newFavoriteState === false) {
+        console.log('[DEBUG-GENERATOR] Toggle favorite: Removing AI-generated recipe:', recipeToSave.id);
         try {
-          await recipeApi.delete(`${API_PATHS.RECIPE.DELETE}${recipe.id}`);
+          await recipeApi.delete(`${API_PATHS.RECIPE.DELETE}${recipeToSave.id}`);
+          console.log('[DEBUG-GENERATOR] Toggle favorite: Recipe removed successfully');
           setRecipe(prev => prev ? {...prev, id: undefined} : null);
           showToast('Recipe removed from favorites', 'success');
           return false;
         } catch (error) {
-          console.error('Error deleting recipe:', error);
+          console.error('[DEBUG-GENERATOR] Toggle favorite: Error removing recipe:', error);
           // Revert UI on error
           setIsFavorite(true);
-          showToast('Failed to remove recipe', 'error');
+          showToast('Database error - unable to remove recipe', 'error');
           return true;
         }
       }
       
       // Regular favorite toggle for existing recipes
       try {
-        const success = await favoriteService.toggleFavorite(recipe.id);
+        console.log('[DEBUG-GENERATOR] Toggle favorite: Toggling existing recipe:', recipeToSave.id);
+        const success = await favoriteService.toggleFavorite(recipeToSave.id);
+        console.log('[DEBUG-GENERATOR] Toggle favorite: Toggle result:', success, typeof success);
         
         // If server response doesn't match our UI state, correct it
         if (success !== newFavoriteState) {
-          console.log('Server state different than expected, correcting UI');
+          console.log('[DEBUG-GENERATOR] Toggle favorite: Server returned different state than expected, correcting UI');
           setIsFavorite(success);
         }
         
@@ -170,20 +219,20 @@ Fat: ${details.nutritionalInformation.fat}
         
         return success;
       } catch (error) {
-        console.error('Error toggling favorite:', error);
+        console.error('[DEBUG-GENERATOR] Toggle favorite: Error toggling recipe:', error);
         // Revert UI on error
         setIsFavorite(!newFavoriteState);
-        showToast('Failed to update favorites', 'error');
-        return !newFavoriteState;
+        showToast('Database error - unable to update favorites', 'error');
+        throw error; // Propagate the error to the FavoriteButton
       }
     } catch (error) {
-      console.error('Unexpected error:', error);
+      console.error('[DEBUG-GENERATOR] Toggle favorite: Unexpected error:', error);
       // Revert UI on error
       setIsFavorite(!newFavoriteState);
-      showToast('An unexpected error occurred', 'error');
-      return !newFavoriteState;
+      showToast('Database error - unexpected problem', 'error');
+      throw error; // Propagate the error to the FavoriteButton
     }
-  }, [recipe, showToast, isFavorite]);
+  }, [recipe, showToast, isFavorite, ensureRecipeMetadata]);
 
   const handleApiError = useCallback((err: unknown) => {
     console.error('Error generating recipe:', err);
@@ -269,6 +318,7 @@ Fat: ${details.nutritionalInformation.fat}
       try {
         const response = await recipeApi.post(API_PATHS.RECIPE.GENERATE, ingredientsArray);
         const data = response.data;
+        console.log('[RecipeGenerator] Recipe data received:', data);
         
         // Check for error response
         if (data.error && data.error.includes('non-food items')) {
@@ -283,6 +333,9 @@ Fat: ${details.nutritionalInformation.fat}
           ingredientsUsed: data.ingredients || [],
           imageUrl: data.imageUrl || '',
           aiGenerated: true,
+          // Use totalTimeMinutes as primary source for cooking time
+          cookingTimeMinutes: data.totalTimeMinutes || data.cookingTimeMinutes || data.prepTimeMinutes,
+          difficulty: data.difficulty,
           recipeDetails: {
             ingredientsList: data.ingredients || [],
             equipmentNeeded: [],
@@ -302,7 +355,29 @@ Fat: ${details.nutritionalInformation.fat}
           },
         };
         
-        setRecipe(recipeData);
+        // Deep copy for safety before ensuring metadata 
+        const enrichedRecipeData = ensureRecipeMetadata({...recipeData});
+        
+        console.log('[RecipeGenerator] Recipe data mapping details:', { 
+          originalData: {
+            totalTimeMinutes: data.totalTimeMinutes,
+            cookingTimeMinutes: data.cookingTimeMinutes, 
+            prepTimeMinutes: data.prepTimeMinutes,
+            difficulty: data.difficulty
+          },
+          mappedData: {
+            cookingTimeMinutes: recipeData.cookingTimeMinutes,
+            difficulty: recipeData.difficulty
+          },
+          enrichedData: {
+            cookingTimeMinutes: enrichedRecipeData.cookingTimeMinutes,
+            difficulty: enrichedRecipeData.difficulty,
+            wasEnriched: enrichedRecipeData.cookingTimeMinutes !== recipeData.cookingTimeMinutes || 
+                         enrichedRecipeData.difficulty !== recipeData.difficulty
+          }
+        });
+        
+        setRecipe(enrichedRecipeData);
         showToast('Recipe generated successfully!', 'success');
       } catch (err: unknown) {
         handleApiError(err);
@@ -310,7 +385,7 @@ Fat: ${details.nutritionalInformation.fat}
         setLoading(false);
       }
     },
-    [ingredients, showToast, handleApiError]
+    [ingredients, showToast, handleApiError, ensureRecipeMetadata]
   );
 
   // -----------------------------

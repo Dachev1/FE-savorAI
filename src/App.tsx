@@ -29,7 +29,7 @@ const RecipeGenerator = lazy(() => import('./pages/Recipe/RecipeGenerator'));
 const RecipeDetail = lazy(() => import('./pages/Recipe/RecipeDetail'));
 const RecipeCreate = lazy(() => import('./pages/Recipe/RecipeCreate'));
 const UserRecipes = lazy(() => import('./pages/Recipe/UserRecipes'));
-const AllRecipes = lazy(() => import('./pages/Recipe/AllRecipes'));
+const RecipeFeed = lazy(() => import('./pages/Recipe/RecipeFeed'));
 const AccountSettings = lazy(() => import('./pages/Profile/AccountSettings'));
 const Error = lazy(() => import('./pages/Error'));
 const AdminDashboard = lazy(() => import('./pages/Admin/AdminDashboard'));
@@ -451,8 +451,8 @@ function App() {
         element={<ProtectedRoute element={<UserRecipes />} />} 
       />
       <Route 
-        path={ROUTES.ALL_RECIPES} 
-        element={<ProtectedRoute element={<AllRecipes />} />} 
+        path={ROUTES.RECIPE_FEED} 
+        element={<ProtectedRoute element={<RecipeFeed />} />} 
       />
       <Route 
         path={ROUTES.ACCOUNT_SETTINGS} 

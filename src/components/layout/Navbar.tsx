@@ -413,6 +413,12 @@ const Navbar: React.FC = memo(() => {
                           My Recipes
                         </Link>
                       </motion.div>
+                      <motion.div variants={{ hidden: { opacity: 0, x: -10 }, visible: { opacity: 1, x: 0 } }}>
+                        <Link to="/recipes/feed" className={dropdownItemClass(isActive('/recipes/feed'))} key="recipe-feed">
+                          <span className="text-blue-500 dark:text-blue-400 text-lg mr-1">•</span>
+                          Recipe Feed
+                        </Link>
+                      </motion.div>
                     </motion.div>
                   </motion.div>
                 )}
@@ -715,6 +721,15 @@ const Navbar: React.FC = memo(() => {
                                     onClick={closeMenu}
                                   >
                                     My Recipes
+                                  </Link>
+                                </motion.div>
+                                <motion.div variants={{ hidden: { opacity: 0, x: -10 }, visible: { opacity: 1, x: 0 } }} transition={{ delay: 0.4 }}>
+                                  <Link 
+                                    to="/recipes/feed" 
+                                    className="py-2 hover:text-blue-600 dark:hover:text-blue-300 transition-all duration-200 hover:translate-x-1"
+                                    onClick={closeMenu}
+                                  >
+                                    Recipe Feed
                                   </Link>
                                 </motion.div>
                               </motion.div>

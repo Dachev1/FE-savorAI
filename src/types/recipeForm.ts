@@ -2,15 +2,19 @@ export interface IFormErrors {
     mealName?: string;
     ingredientsUsed?: string;
     recipeDetails?: string;
-    prepTimeMinutes?: string;
+    totalTimeMinutes?: string;
+    difficulty?: string;
     [key: string]: string | undefined;
   }
   
   export interface IMacros {
     calories: number;
     protein: number;
-    carbohydrates: number;
+    carbs: number;
     fat: number;
+    proteinGrams?: number;
+    carbsGrams?: number;
+    fatGrams?: number;
   }
   
   export interface IRecipeFormData {
@@ -18,17 +22,25 @@ export interface IFormErrors {
     imageUrl: string;
     ingredientsUsed: string[];
     recipeDetails: string;
-    prepTimeMinutes?: number;
-    showPrepTime?: boolean;
+    totalTimeMinutes?: number;
+    showTotalTime?: boolean;
     macros?: IMacros | null;
     showMacros?: boolean;
+    instructions: string;
+    servingSuggestions: string;
+    equipment: string;
+    ingredients: string;
+    imageFile: File | null;
+    aiGenerated?: boolean;
+    difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
   }
   
   export interface IRecipePayload {
     mealName: string;
     recipeDetails: string;
     ingredientsUsed: string[];
-    prepTimeMinutes?: number;
+    totalTimeMinutes?: number;
     macros?: IMacros;
+    difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
   }
   

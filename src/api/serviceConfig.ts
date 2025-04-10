@@ -26,7 +26,7 @@ export const API_PATHS = {
   // Recipe endpoints (Recipe Service - 8082)
   RECIPE: {
     GENERATE: '/api/v1/recipes/generate',
-    CREATE: '/api/v1/recipes/create-meal',
+    CREATE: '/api/v1/recipes',
     GET_ALL: '/api/v1/recipes',
     GET_ONE: '/api/v1/recipes/',
     UPDATE: '/api/v1/recipes/',

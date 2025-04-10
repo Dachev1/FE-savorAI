@@ -5,11 +5,10 @@ import auth from '../utils/auth';
 const pendingRequests = new Map<string, CancelTokenSource>();
 
 /**
- * Centralized API configuration with interceptors for auth, error handling,
- * and request deduplication
+ * Centralized API configuration with interceptors
  */
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: import.meta.env.VITE_API_URL, 
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -18,7 +17,7 @@ const axiosInstance = axios.create({
   timeout: 30000 // 30 second timeout
 });
 
-// Add ability to cancel pending requests (useful for cleanup)
+// Add ability to cancel pending requests
 axiosInstance.cancelPendingRequests = () => {
   pendingRequests.forEach((source, key) => {
     source.cancel('Operation canceled due to new request');
@@ -56,13 +55,12 @@ axiosInstance.interceptors.request.use(
     // Special case for logout requests 
     const isLogoutRequest = config.url?.includes('/auth/logout');
     
-    // Handle duplicate requests by generating a unique key based on method, URL, and params
+    // Handle duplicate requests
     const requestKey = `${config.method}-${config.url}-${JSON.stringify(config.params || {})}`;
     
-    // Cancel any existing duplicate requests
     if (pendingRequests.has(requestKey) && !isLogoutRequest) {
       const source = pendingRequests.get(requestKey)!;
-      source.cancel('Previous duplicate request cancelled. This is normal behavior to optimize performance.');
+      source.cancel('Previous duplicate request cancelled');
       pendingRequests.delete(requestKey);
     }
     
@@ -71,16 +69,15 @@ axiosInstance.interceptors.request.use(
     config.cancelToken = config.cancelToken || source.token;
     pendingRequests.set(requestKey, source);
     
-    // Add cleanup function to be called after request completes
+    // Add cleanup function
     const originalComplete = config.onComplete;
     config.onComplete = () => {
       pendingRequests.delete(requestKey);
       if (originalComplete) originalComplete();
     };
     
-    // Add auth token for protected endpoints or logout requests
+    // Add auth token for protected endpoints
     if (!isPublicEndpoint || isLogoutRequest) {
-      // Skip if no valid token for protected endpoints
       if (!auth.isTokenValid() && !isLogoutRequest) {
         source.cancel('No valid authentication');
         return Promise.reject({ cancelled: true });
@@ -112,7 +109,6 @@ axiosInstance.interceptors.response.use(
                      response.headers['Authorization'];
                      
     if (authToken) {
-      // Remove Bearer prefix if present
       const rawToken = authToken.startsWith('Bearer ') 
         ? authToken.substring(7) 
         : authToken;

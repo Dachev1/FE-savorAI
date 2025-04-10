@@ -9,7 +9,14 @@ import {
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 
-// Recipe interface with vote counts
+// Define a simplified DTO for favorite recipes
+interface FavoriteRecipeDTO {
+  id: string;
+  title: string;
+  imageUrl: string | null;
+  ingredients: string[];
+}
+
 interface Recipe {
   id: string;
   mealName?: string;
@@ -26,7 +33,7 @@ interface Recipe {
     carbs?: number;
     fat?: number;
   };
-  rawData: any; // Added rawData property
+  rawData?: any; // For reference only
 }
 
 const FavoritesPage = () => {
@@ -59,21 +66,21 @@ const FavoritesPage = () => {
         console.log('Fetched favorites:', response.data);
         
         if (Array.isArray(response.data) && response.data.length > 0) {
-          // Transform the API response to handle the nested recipe structure
-          const processedFavorites = response.data.map(favorite => ({
-            id: favorite.recipeId || favorite.recipe?.id,
-            mealName: favorite.recipe?.title,
-            title: favorite.recipe?.title,
-            imageUrl: favorite.recipe?.imageUrl,
-            ingredientsUsed: favorite.recipe?.ingredients,
-            prepTimeMinutes: favorite.recipe?.totalTimeMinutes,
-            macros: favorite.recipe?.macros,
-            upvotes: favorite.recipe?.favoriteCount || 0,
-            commentCount: favorite.recipe?.commentCount || 0,
-            // Add any other needed properties
-            rawData: favorite // Keep the original data if needed elsewhere
-          }));
+          // Transform the API response to a simplified recipe DTO
+          const processedFavorites = response.data.map(favorite => {
+            // Extract only essential information
+            const recipeData = favorite.recipe || {};
+            
+            // Create a simplified recipe object
+            return {
+              id: favorite.recipeId || recipeData.id,
+              title: recipeData.title || '',
+              imageUrl: recipeData.imageUrl || null,
+              ingredientsUsed: Array.isArray(recipeData.ingredients) ? recipeData.ingredients : []
+            };
+          });
 
+          console.log('Simplified favorites data:', processedFavorites);
           setFavorites(processedFavorites);
           setError(null);
         } else {
@@ -109,7 +116,7 @@ const FavoritesPage = () => {
   const filteredFavorites = useMemo(() => 
     favorites.filter(recipe => 
       !searchTerm || 
-      (recipe.mealName || recipe.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (recipe.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (recipe.ingredientsUsed || []).some(i => i.toLowerCase().includes(searchTerm.toLowerCase()))
     ), 
     [favorites, searchTerm]
@@ -137,19 +144,19 @@ const FavoritesPage = () => {
         const response = await axios.get('/api/v1/favorites/all');
         
         if (Array.isArray(response.data)) {
-          // Transform the API response to handle the nested recipe structure
-          const processedFavorites = response.data.map(favorite => ({
-            id: favorite.recipeId || favorite.recipe?.id,
-            mealName: favorite.recipe?.title,
-            title: favorite.recipe?.title,
-            imageUrl: favorite.recipe?.imageUrl,
-            ingredientsUsed: favorite.recipe?.ingredients,
-            prepTimeMinutes: favorite.recipe?.totalTimeMinutes,
-            macros: favorite.recipe?.macros,
-            upvotes: favorite.recipe?.favoriteCount || 0,
-            commentCount: favorite.recipe?.commentCount || 0,
-            rawData: favorite
-          }));
+          // Transform the API response to a simplified recipe DTO
+          const processedFavorites = response.data.map(favorite => {
+            // Extract only essential information
+            const recipeData = favorite.recipe || {};
+            
+            // Create a simplified recipe object
+            return {
+              id: favorite.recipeId || recipeData.id,
+              title: recipeData.title || '',
+              imageUrl: recipeData.imageUrl || null,
+              ingredientsUsed: Array.isArray(recipeData.ingredients) ? recipeData.ingredients : []
+            };
+          });
 
           setFavorites(processedFavorites);
         }
@@ -170,11 +177,27 @@ const FavoritesPage = () => {
       e.stopPropagation();
     }
     
-    if (recipeId) {
-      console.log("Navigating to recipe details:", recipeId);
-      navigate(`/recipes/${recipeId}`);
-    } else {
-      console.error("Recipe ID is missing");
+    if (!recipeId) {
+      console.error("Recipe ID is missing for navigation");
+      return;
+    }
+    
+    // Make sure we're using a clean string ID value
+    const cleanId = String(recipeId).trim();
+    
+    if (!cleanId) {
+      console.error("Clean recipe ID is empty after trimming");
+      return;
+    }
+    
+    console.log("Navigating to recipe details with ID:", cleanId);
+    
+    // Ensure we're using the correct ID format and path
+    try {
+      // Use the correct path format for recipe details
+      navigate(`/recipes/${cleanId}`);
+    } catch (error) {
+      console.error("Navigation error:", error);
     }
   }, [navigate]);
 
@@ -244,7 +267,20 @@ const FavoritesPage = () => {
                     <div 
                       key={recipeKey} 
                       className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg cursor-pointer transform hover:-translate-y-1 transition-all overflow-hidden flex flex-col h-80"
-                      onClick={(e) => recipe.id && navigateToRecipe(recipe.id, e)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        console.log("Recipe card clicked:", recipeKey);
+                        if (recipe.id) {
+                          console.log("Card clicked, recipe data:", {
+                            id: recipe.id,
+                            title: recipe.title,
+                            hasImage: recipe.imageUrl ? true : false
+                          });
+                          navigateToRecipe(recipe.id, e);
+                        } else {
+                          console.error("Recipe card has no ID");
+                        }
+                      }}
                       data-aos="fade-up"
                       data-aos-delay={Math.min(index * 50, 300)}
                     >
@@ -252,13 +288,13 @@ const FavoritesPage = () => {
                         <div className="h-44 relative overflow-hidden flex-shrink-0">
                           <img 
                             src={recipe.imageUrl} 
-                            alt={recipe.mealName || recipe.title || 'Recipe'} 
+                            alt={recipe.title || 'Recipe'} 
                             className="w-full h-full object-cover transition-transform hover:scale-110 duration-500"
                             loading="lazy"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               target.onerror = null;
-                              target.src = 'https://via.placeholder.com/300x200?text=Recipe+Image';
+                              target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop';
                             }}
                           />
                           <button 
@@ -286,12 +322,27 @@ const FavoritesPage = () => {
                       
                       <div className="p-5 flex flex-col flex-grow justify-between">
                         <h3 className="font-semibold text-lg text-gray-800 dark:text-white mb-2 text-center line-clamp-2 h-14 overflow-hidden">
-                          {recipe.mealName || recipe.title || 'Untitled Recipe'}
+                          {recipe.title || 'Untitled Recipe'}
                         </h3>
                         
                         <button 
                           className="w-full mt-auto py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm flex items-center justify-center"
-                          onClick={(e) => recipe.id && navigateToRecipe(recipe.id, e)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log("View Details button clicked:", recipeKey);
+                            if (recipe.id) {
+                              console.log("Button clicked, navigating with ID:", recipe.id);
+                              console.log("Recipe data summary:", {
+                                id: recipe.id,
+                                title: recipe.title,
+                                hasImage: recipe.imageUrl ? true : false
+                              });
+                              navigateToRecipe(recipe.id, e);
+                            } else {
+                              console.error("No recipe ID available for navigation");
+                            }
+                          }}
                         >
                           View Details
                         </button>

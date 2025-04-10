@@ -1,7 +1,6 @@
 export const NAV_ITEMS = {
     recipes: [
       { name: 'Recipe Generator', path: '/' },
-      { name: 'Community Recipes', path: '/recipes/community' },
       { name: 'Create a Recipe', path: '/recipes/create' },
     ],
     singleLinks: [

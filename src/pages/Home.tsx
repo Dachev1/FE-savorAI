@@ -16,7 +16,7 @@ const FeatureCard = memo<{ icon: React.ReactNode; title: string; description: st
     data-aos-delay={delay}
   >
     <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-100 to-transparent dark:from-blue-900/20 dark:to-transparent rounded-bl-full -z-10"></div>
-    <div className="flex justify-center mb-4 text-blue-600 dark:text-blue-400">
+    <div className="flex justify-center mb-4 text-blue-600 dark:text-blue-400" aria-hidden="true">
       {icon}
     </div>
     <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-white text-center">{title}</h3>
@@ -32,7 +32,10 @@ const StepCard = memo<{ number: number; title: string; description: string; dela
     data-aos="fade-up"
     data-aos-delay={delay}
   >
-    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center text-xl font-bold mb-4 mx-auto transform transition-all duration-300 hover:scale-110">
+    <div 
+      className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center text-xl font-bold mb-4 mx-auto transform transition-all duration-300 hover:scale-110"
+      aria-hidden="true"
+    >
       {number}
     </div>
     <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-white text-center">{title}</h3>
@@ -68,9 +71,12 @@ const AuthenticatedHome = memo(() => {
   const { isDarkMode } = useDarkMode();
   
   return (
-    <div className="w-full py-8">
+    <section className="w-full py-8" aria-labelledby="welcome-heading">
       <div className="max-w-6xl mx-auto px-4">
-        <h1 className="text-3xl font-bold mb-8 text-center">
+        <h1 
+          id="welcome-heading"
+          className="text-3xl font-bold mb-8 text-center"
+        >
           <span className={`text-transparent bg-clip-text ${
             isDarkMode 
               ? 'bg-gradient-to-r from-blue-300 to-indigo-400' 
@@ -84,7 +90,7 @@ const AuthenticatedHome = memo(() => {
           {/* Generate Recipe Card */}
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden border border-gray-200 dark:border-gray-700">
             <div className="h-36 bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
-              <FiZap className="text-white h-16 w-16" />
+              <FiZap className="text-white h-16 w-16" aria-hidden="true" />
             </div>
             <div className="p-6">
               <h2 className="text-xl font-bold mb-3">Generate Recipe</h2>
@@ -139,7 +145,7 @@ const AuthenticatedHome = memo(() => {
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 });
 
@@ -150,6 +156,13 @@ const UnauthenticatedHome = memo(() => {
   useEffect(() => {
     setIsVisible(true);
     
+    // Initialize AOS with options
+    AOS.init({
+      once: true,
+      duration: 800,
+      easing: 'ease-in-out'
+    });
+    
     // Reset AOS animations when component mounts
     AOS.refresh();
   }, []);
@@ -157,11 +170,11 @@ const UnauthenticatedHome = memo(() => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 relative overflow-hidden">
       {/* Animated background elements */}
-      <div className="absolute top-20 left-10 w-72 h-72 bg-blue-200 dark:bg-blue-900/30 rounded-full mix-blend-multiply dark:mix-blend-soft-light blur-xl opacity-70 dark:opacity-30 animate-blob"></div>
-      <div className="absolute top-40 right-10 w-72 h-72 bg-purple-200 dark:bg-purple-900/30 rounded-full mix-blend-multiply dark:mix-blend-soft-light blur-xl opacity-70 dark:opacity-30 animate-blob animation-delay-2000"></div>
-      <div className="absolute -bottom-20 left-1/3 w-72 h-72 bg-amber-200 dark:bg-amber-900/30 rounded-full mix-blend-multiply dark:mix-blend-soft-light blur-xl opacity-70 dark:opacity-30 animate-blob animation-delay-4000"></div>
+      <div className="absolute top-20 left-10 w-72 h-72 bg-blue-200 dark:bg-blue-900/30 rounded-full mix-blend-multiply dark:mix-blend-soft-light blur-xl opacity-70 dark:opacity-30 animate-blob" aria-hidden="true"></div>
+      <div className="absolute top-40 right-10 w-72 h-72 bg-purple-200 dark:bg-purple-900/30 rounded-full mix-blend-multiply dark:mix-blend-soft-light blur-xl opacity-70 dark:opacity-30 animate-blob animation-delay-2000" aria-hidden="true"></div>
+      <div className="absolute -bottom-20 left-1/3 w-72 h-72 bg-amber-200 dark:bg-amber-900/30 rounded-full mix-blend-multiply dark:mix-blend-soft-light blur-xl opacity-70 dark:opacity-30 animate-blob animation-delay-4000" aria-hidden="true"></div>
       
-      <div className="container mx-auto px-4 py-12 relative z-10">
+      <main className="container mx-auto px-4 py-12 relative z-10">
         <div className={`text-center mb-8 transition-all duration-1000 transform ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'}`}>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-700 dark:from-blue-400 dark:to-indigo-300">
             Welcome to SavorAI
@@ -172,35 +185,45 @@ const UnauthenticatedHome = memo(() => {
         </div>
 
         {/* CTA Section */}
-        <div className="text-center py-10 px-6 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-xl mb-24" data-aos="zoom-in">
-          <h2 className="text-3xl font-bold text-white mb-4">Ready to transform your cooking experience?</h2>
+        <section 
+          className="text-center py-10 px-6 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-xl mb-24" 
+          data-aos="zoom-in"
+          aria-labelledby="cta-heading"
+        >
+          <h2 id="cta-heading" className="text-3xl font-bold text-white mb-4">Ready to transform your cooking experience?</h2>
           <p className="text-blue-100 mb-8 max-w-2xl mx-auto">Join SavorAI today and discover a world of delicious possibilities.</p>
-          <Link to="/signup" className="inline-block px-8 py-3 bg-white text-blue-600 font-medium rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+          <Link 
+            to="/signup" 
+            className="inline-block px-8 py-3 bg-white text-blue-600 font-medium rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
+          >
             Get Started for Free
           </Link>
-        </div>
+        </section>
 
         {/* Features Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-24">
-          <FeatureCard
-            icon={<FaRobot className="w-10 h-10" />}
-            title="AI-Powered Recipes"
-            description="Get personalized recipe recommendations based on your preferences and dietary requirements."
-            delay={200}
-          />
-          <FeatureCard
-            icon={<FaHeart className="w-10 h-10" />}
-            title="Save Favorites"
-            description="Create your personal collection of favorite recipes for quick access."
-            delay={300}
-          />
-          <FeatureCard
-            icon={<FaUsers className="w-10 h-10" />}
-            title="Community Sharing"
-            description="Share your recipes with the community and discover new favorites."
-            delay={400}
-          />
-        </div>
+        <section className="mb-24" aria-labelledby="features-heading">
+          <h2 id="features-heading" className="sr-only">Key Features</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <FeatureCard
+              icon={<FaRobot className="w-10 h-10" />}
+              title="AI-Powered Recipes"
+              description="Get personalized recipe recommendations based on your preferences and dietary requirements."
+              delay={200}
+            />
+            <FeatureCard
+              icon={<FaHeart className="w-10 h-10" />}
+              title="Save Favorites"
+              description="Create your personal collection of favorite recipes for quick access."
+              delay={300}
+            />
+            <FeatureCard
+              icon={<FaUsers className="w-10 h-10" />}
+              title="Community Sharing"
+              description="Share your recipes with the community and discover new favorites."
+              delay={400}
+            />
+          </div>
+        </section>
 
         {/* How It Works Section */}
         <div className="text-center mb-24" data-aos="fade-up">
@@ -261,7 +284,7 @@ const UnauthenticatedHome = memo(() => {
             />
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 });
