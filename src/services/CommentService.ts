@@ -1,4 +1,5 @@
 import axios from '../api/axiosConfig';
+import { recipeServiceAxios } from '../api/axiosConfig';
 
 export interface CommentData {
   id?: string;
@@ -21,7 +22,7 @@ const CommentService = {
   getComments: async (recipeId: string): Promise<CommentData[]> => {
     try {
       if (!recipeId) throw new Error('Recipe ID is required');
-      const response = await axios.get(`/v1/comments/${recipeId}`);
+      const response = await recipeServiceAxios.get(`/v1/comments/${recipeId}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching comments:', error);
@@ -39,7 +40,7 @@ const CommentService = {
       if (!content) throw new Error('Comment content is required');
       if (!recipeId) throw new Error('Recipe ID is required');
       
-      const response = await axios.post('/v1/comments', {
+      const response = await recipeServiceAxios.post('/v1/comments', {
         recipeId,
         content
       });
@@ -60,7 +61,7 @@ const CommentService = {
       if (!commentId) throw new Error('Comment ID is required');
       if (!content) throw new Error('Comment content is required');
       
-      const response = await axios.put(`/v1/comments/${commentId}`, { content });
+      const response = await recipeServiceAxios.put(`/v1/comments/${commentId}`, { content });
       return response.data;
     } catch (error) {
       console.error('Error updating comment:', error);
@@ -76,7 +77,7 @@ const CommentService = {
     try {
       if (!commentId) throw new Error('Comment ID is required');
       
-      await axios.delete(`/v1/comments/${commentId}`);
+      await recipeServiceAxios.delete(`/v1/comments/${commentId}`);
     } catch (error) {
       console.error('Error deleting comment:', error);
       throw error;
@@ -91,7 +92,7 @@ const CommentService = {
     try {
       if (!recipeId) return 0;
       
-      const response = await axios.get(`/v1/comments/${recipeId}/count`);
+      const response = await recipeServiceAxios.get(`/v1/comments/${recipeId}/count`);
       return response.data.count || 0;
     } catch (error) {
       console.error('Error getting comment count:', error);

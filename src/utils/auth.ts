@@ -132,9 +132,7 @@ const auth = {
     try {
       const token = this.getToken();
       
-      // No token → not valid
       if (!token) {
-        console.debug('No auth token found');
         return false;
       }
       
@@ -145,41 +143,28 @@ const auth = {
       }
       
       // Parse and validate the token
-      try {
-        const payload = this.parseToken(token);
-        
-        // Check if payload exists and has expiration
-        if (!payload || !payload.exp) {
-          this.updateTokenCache(token, false, now);
-          console.debug('Token payload invalid or missing expiry');
-          return false;
-        }
-        
-        // Check if token is expired (with 30s buffer)
-        const expiryTime = payload.exp * 1000;
-        const isValid = expiryTime > (now + 30000);
-        
-        if (!isValid) {
-          console.debug(`Token expired: ${new Date(expiryTime)} is before ${new Date(now + 30000)}`);
-        }
-        
-        // Check for banned status
-        if (payload.banned === true) {
-          console.warn('User is banned according to token payload');
-          this.updateTokenCache(token, false, now);
-          return false;
-        }
-        
-        // Update cache and return result
-        this.updateTokenCache(token, isValid, now);
-        return isValid;
-      } catch (error) {
-        console.debug('Error parsing token:', error);
+      const payload = this.parseToken(token);
+      
+      // Check if payload exists and has expiration
+      if (!payload || !payload.exp) {
         this.updateTokenCache(token, false, now);
         return false;
       }
+      
+      // Check if token is expired (with 30s buffer)
+      const expiryTime = payload.exp * 1000;
+      const isValid = expiryTime > (now + 30000);
+      
+      // Check for banned status
+      if (payload.banned === true) {
+        this.updateTokenCache(token, false, now);
+        return false;
+      }
+      
+      // Update cache and return result
+      this.updateTokenCache(token, isValid, now);
+      return isValid;
     } catch (error) {
-      console.error('Error validating token:', error);
       return false;
     }
   },
@@ -187,7 +172,7 @@ const auth = {
   /**
    * Helper method to update token cache consistently
    */
-  private updateTokenCache(token: string, isValid: boolean, timestamp: number): void {
+  updateTokenCache(token: string, isValid: boolean, timestamp: number): void {
     tokenCache.token = token;
     tokenCache.isValid = isValid;
     tokenCache.timestamp = timestamp;

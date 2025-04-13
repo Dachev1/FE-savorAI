@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import axios from '../../api/axiosConfig';
+import { recipeServiceAxios } from '../../api/axiosConfig';
 import { useAuth } from '../../context';
 import { LoadingSpinner } from '../../components/common';
 import { 
-  FaRobot, FaClock, FaUtensils, FaArrowLeft, FaHeart, FaStar, 
-  FaFireAlt, FaDumbbell, FaCarrot, FaOilCan, FaShare, FaBookmark,
-  FaEdit, FaTrash, FaPrint, FaCheck, FaChevronLeft, FaChartLine
+  FaRobot, FaClock, FaUtensils, FaArrowLeft, FaStar,
+  FaFireAlt, FaDumbbell, FaCarrot, FaOilCan, FaBookmark,
+  FaEdit, FaCheck, FaChevronLeft
 } from 'react-icons/fa';
 import RecipeComments from '../../components/recipe/RecipeComments';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface Recipe {
   id: string;
@@ -21,7 +22,7 @@ interface Recipe {
   prepTime: number;
   cookTime: number;
   servings: number;
-  authorId: string;
+  authorId?: string;
   authorName: string;
   macros: {
     calories: number;
@@ -32,7 +33,6 @@ interface Recipe {
   isAiGenerated?: boolean;
   servingSuggestions?: string;
   difficulty?: string;
-  isFavorite?: boolean;
   tags: string[];
   createdAt: string;
   totalTimeMinutes?: number;
@@ -108,27 +108,22 @@ const RecipeDetail: React.FC = () => {
         ? `/api/v1/favorites/recipes/${id}` 
         : `/api/v1/recipes/${id}`;
         
-      const response = await axios.get(endpoint);
+      const response = await recipeServiceAxios.get(endpoint);
       
-      // Normalize recipe data to handle missing properties
+      // Normalize recipe data
       const normalizedRecipe = {
         ...response.data,
         tags: response.data.tags || [],
         description: response.data.description || response.data.servingSuggestions || '',
-        servingSuggestions: response.data.servingSuggestions || '',
         authorName: response.data.authorName || 'Unknown',
-        prepTime: response.data.prepTime || (response.data.totalTimeMinutes ? Math.floor(response.data.totalTimeMinutes / 2) : 0),
-        cookTime: response.data.cookTime || (response.data.totalTimeMinutes ? Math.floor(response.data.totalTimeMinutes / 2) : 0),
-        servings: response.data.servings || 1,
-        isAiGenerated: response.data.isAiGenerated || false,
-        isFavorite: isFromFavorites ? true : (response.data.isFavorite || false),
-        totalTimeMinutes: response.data.totalTimeMinutes || ((response.data.prepTime || 0) + (response.data.cookTime || 0)),
+        totalTimeMinutes: response.data.totalTimeMinutes || 
+                         ((response.data.prepTime || 0) + (response.data.cookTime || 0)),
         difficulty: response.data.difficulty || 'MEDIUM',
         instructions: Array.isArray(response.data.instructions) 
           ? response.data.instructions 
-          : typeof response.data.instructions === 'string'
-            ? response.data.instructions.split('\n').filter((line: string) => line.trim())
-            : [],
+          : (typeof response.data.instructions === 'string'
+              ? response.data.instructions.split('\n').filter((line: string) => line.trim())
+              : []),
         macros: {
           calories: response.data.macros?.calories || 0,
           protein: response.data.macros?.protein || response.data.macros?.proteinGrams || 0,
@@ -142,10 +137,10 @@ const RecipeDetail: React.FC = () => {
     } catch (err: unknown) {
       console.error('Error fetching recipe:', err);
       
-      if (err && typeof err === 'object' && 'response' in err) {
+      if (typeof err === 'object' && err && 'response' in err) {
         const axiosErr = err as { response?: { status: number } };
         if (axiosErr.response?.status === 404) {
-          setError(`Recipe not found. It may have been deleted.`);
+          setError('Recipe not found. It may have been deleted.');
         } else if (axiosErr.response?.status === 403) {
           setError('You do not have permission to view this recipe.');
         } else {
@@ -169,7 +164,7 @@ const RecipeDetail: React.FC = () => {
     }
 
     try {
-      await axios.delete(`/api/v1/recipes/${id}`);
+      await recipeServiceAxios.delete(`/api/v1/recipes/${id}`);
       navigate('/');
     } catch (err) {
       console.error('Error deleting recipe:', err);
@@ -202,6 +197,26 @@ const RecipeDetail: React.FC = () => {
     recipe ? (recipe.totalTimeMinutes || ((recipe.prepTime || 0) + (recipe.cookTime || 0))) : 0,
     [recipe]
   );
+
+  // Helper function to get avatar initial
+  const getAvatarInitial = (authorName: string, username: string | undefined, isAuthor: boolean | undefined) => {
+    if (authorName && authorName !== "Unknown User") {
+      return authorName.charAt(0).toUpperCase();
+    } else if (isAuthor) {
+      return username?.charAt(0).toUpperCase() || "?";
+    }
+    return "?";
+  };
+
+  // Helper function to get display name
+  const getDisplayName = (authorName: string, username: string | undefined, isAuthor: boolean | undefined) => {
+    if (authorName && authorName !== "Unknown User") {
+      return authorName;
+    } else if (isAuthor) {
+      return username || "Unknown User";
+    }
+    return "Unknown User";
+  };
 
   if (loading) {
     return (
@@ -325,14 +340,14 @@ const RecipeDetail: React.FC = () => {
           {/* Recipe author */}
           <div className="flex items-center mb-6">
             <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold text-sm mr-3">
-              {recipe.authorId ? recipe.authorId.substring(0, 2).toUpperCase() : 'ID'}
+              {getAvatarInitial(recipe.authorName, user?.username, user?.id === recipe.authorId)}
             </div>
             <div className="flex flex-col">
               <span className="text-gray-700 dark:text-gray-300">
-                Created by <span className="font-medium">{recipe.authorName}</span>
-              </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                ID: {recipe.authorId || 'Unknown'}
+                Created by{' '}
+                <span className="font-medium">
+                  {getDisplayName(recipe.authorName, user?.username, user?.id === recipe.authorId)}
+                </span>
               </span>
             </div>
           </div>

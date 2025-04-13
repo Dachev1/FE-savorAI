@@ -36,7 +36,7 @@ const VoteButtons: React.FC<VoteButtonsProps> = ({
   const isAuthor = user && user.id === authorId;
 
   const sizeClasses = {
-    small: { container: 'text-xs', button: 'px-2 py-1', icon: 'text-sm' },
+    small: { container: 'text-xs', button: 'px-1.5 py-0.5', icon: 'text-xs' },
     medium: { container: 'text-sm', button: 'px-3 py-1.5', icon: 'text-base' },
     large: { container: 'text-base', button: 'px-4 py-2', icon: 'text-lg' },
   };
@@ -54,34 +54,52 @@ const VoteButtons: React.FC<VoteButtonsProps> = ({
 
     try {
       setIsVoting(true);
+      console.log(`[DEBUG] Starting vote on recipe ${recipeId}, type: ${voteType}, current upvotes: ${localUpvotes}, downvotes: ${localDownvotes}`);
       
-      const isToggle = 
-        (voteType === VoteType.UP && localUserVote === 'UPVOTE') || 
-        (voteType === VoteType.DOWN && localUserVote === 'DOWNVOTE');
+      // Determine vote action type
+      const isToggle = (voteType === VoteType.UP && localUserVote === 'UPVOTE') || 
+                     (voteType === VoteType.DOWN && localUserVote === 'DOWNVOTE');
+      const isChangeDirection = localUserVote && !isToggle;
       
+      console.log(`[DEBUG] Vote analysis - isToggle: ${isToggle}, isChangeDirection: ${isChangeDirection}, current userVote: ${localUserVote}`);
+      
+      // Calculate new state values
       let newUpvotes = localUpvotes;
       let newDownvotes = localDownvotes;
       let newUserVote = localUserVote;
       
+      // Update local vote counts based on the action
       if (isToggle) {
-        if (voteType === VoteType.UP) newUpvotes--;
-        else newDownvotes--;
-        newUserVote = null;
-      } 
-      else if (localUserVote) {
+        // User is turning off their vote
         if (voteType === VoteType.UP) {
-          newUpvotes++;
-          newDownvotes--;
+          newUpvotes = Math.max(0, newUpvotes - 1);
         } else {
-          newDownvotes++;
-          newUpvotes--;
+          newDownvotes = Math.max(0, newDownvotes - 1);
+        }
+        newUserVote = null;
+        console.log(`[DEBUG] Toggling vote OFF, new counts: up ${newUpvotes}, down ${newDownvotes}`);
+      } 
+      else if (isChangeDirection) {
+        // User is changing vote direction
+        if (voteType === VoteType.UP) {
+          newUpvotes = Math.max(0, newUpvotes + 1);
+          newDownvotes = Math.max(0, newDownvotes - 1);
+        } else {
+          newDownvotes = Math.max(0, newDownvotes + 1);
+          newUpvotes = Math.max(0, newUpvotes - 1);
         }
         newUserVote = voteType === VoteType.UP ? 'UPVOTE' : 'DOWNVOTE';
+        console.log(`[DEBUG] Changing vote direction, new counts: up ${newUpvotes}, down ${newDownvotes}`);
       } 
       else {
-        if (voteType === VoteType.UP) newUpvotes++;
-        else newDownvotes++;
+        // New vote
+        if (voteType === VoteType.UP) {
+          newUpvotes = Math.max(0, newUpvotes + 1);
+        } else {
+          newDownvotes = Math.max(0, newDownvotes + 1);
+        }
         newUserVote = voteType === VoteType.UP ? 'UPVOTE' : 'DOWNVOTE';
+        console.log(`[DEBUG] New vote, new counts: up ${newUpvotes}, down ${newDownvotes}`);
       }
       
       // Update local state optimistically
@@ -93,18 +111,27 @@ const VoteButtons: React.FC<VoteButtonsProps> = ({
         onVoteChange({ upvotes: newUpvotes, downvotes: newDownvotes, userVote: newUserVote });
       }
       
+      // Call API
+      console.log(`[DEBUG] Calling API to vote on recipe ${recipeId}`);
       const updated = await VoteService.voteRecipe(recipeId, voteType);
+      console.log(`[DEBUG] API response:`, updated);
       
       // Update with server response
-      setLocalUpvotes(updated.upvotes || 0);
-      setLocalDownvotes(updated.downvotes || 0);
-      setLocalUserVote(updated.userVote);
+      const serverUpvotes = updated.upvotes || 0;
+      const serverDownvotes = updated.downvotes || 0;
+      const serverUserVote = updated.userVote || null;
+      
+      setLocalUpvotes(serverUpvotes);
+      setLocalDownvotes(serverDownvotes);
+      setLocalUserVote(serverUserVote);
+      
+      console.log(`[DEBUG] Updated state from server: up ${serverUpvotes}, down ${serverDownvotes}, userVote: ${serverUserVote}`);
       
       if (onVoteChange) {
         onVoteChange({
-          upvotes: updated.upvotes || 0,
-          downvotes: updated.downvotes || 0,
-          userVote: updated.userVote
+          upvotes: serverUpvotes,
+          downvotes: serverDownvotes,
+          userVote: serverUserVote
         });
       }
     } catch (err) {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
-import apiClient from '../api/axiosConfig';
+import ContactService from '../api/contactService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ROUTES } from '../routes';
 import { PulseLoader } from 'react-spinners';
@@ -76,8 +76,8 @@ const Contact: React.FC = () => {
       // Brief delay to show loading state
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      // Submit the form data
-      await apiClient.post('/api/v1/contact/submit', formData);
+      // Submit the form using the dedicated contact service
+      await ContactService.submitContactForm(formData);
       
       // Always redirect to success page regardless of API response
       const successPagePath = ROUTES.CONTACT_SUCCESS;

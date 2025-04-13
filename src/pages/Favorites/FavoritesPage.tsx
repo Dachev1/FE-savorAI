@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from '../../api/axiosConfig';
+import { recipeServiceAxios } from '../../api/axiosConfig';
 import { LoadingSpinner } from '../../components/common';
 import { 
   FaHeart, FaHeartBroken, FaSearch, FaThumbsUp, 
@@ -60,7 +60,7 @@ const FavoritesPage = () => {
     const fetchFavorites = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get('/api/v1/favorites/all', {
+        const response = await recipeServiceAxios.get('/api/v1/favorites/all', {
           signal: controller.signal
         });
         console.log('Fetched favorites:', response.data);
@@ -135,13 +135,13 @@ const FavoritesPage = () => {
       setFavorites(prevFavorites => prevFavorites.filter(recipe => recipe.id !== recipeId));
       
       // Call API to remove from favorites
-      await axios.delete(`/api/v1/favorites/${recipeId}`);
+      await recipeServiceAxios.delete(`/api/v1/favorites/${recipeId}`);
     } catch (error) {
       console.error('Failed to remove from favorites:', error);
       
       // Restore the removed favorite on error by reloading all favorites
       try {
-        const response = await axios.get('/api/v1/favorites/all');
+        const response = await recipeServiceAxios.get('/api/v1/favorites/all');
         
         if (Array.isArray(response.data)) {
           // Transform the API response to a simplified recipe DTO

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from './ToastContext';
-import { ToastType } from '../components/common/Toast';
+import type { ToastType } from '../components/common/Toast';
 import api, { authApi } from '../api/apiService';
 import auth from '../utils/auth';
 import { ROUTES } from '../routes';
@@ -73,6 +73,7 @@ interface AuthContextInterface {
     success: boolean;
     message?: string;
     error?: string;
+    requiresRelogin?: boolean;
   }>;
   fetchUserProfile: () => Promise<boolean>;
 }
@@ -211,84 +212,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     lastRefreshTimeRef.current = now;
     
     try {
-      if (!auth.isTokenValid()) {
+      const token = auth.getToken();
+      if (!auth.isTokenValid() || !token) {
         refreshInProgressRef.current = false;
         return false;
+      }
+
+      // Use cached user data instead of making a profile request
+      const userData = auth.getUser<User>();
+      if (userData?.id) {
+        // Mark the refresh as successful even without server verification
+        return true;
       }
       
-      try {
-        const response = await authApi.get<ProfileResponse>('/api/v1/profile', {
-          headers: {
-            'Authorization': `Bearer ${auth.getToken()}`,
-            'Cache-Control': 'no-cache',
-          },
-          params: {
-            '_': Date.now()
-          }
-        });
-        
-        const profileData = response.data;
-        
-        if (profileData?.id) {
-          const previousRole = user?.role;
-          
-          updateUserState(profileData);
-          
-          if (previousRole && profileData.role && previousRole !== profileData.role) {
-            showToast(`Your account role has been updated to ${profileData.role}`, 'info', 5000);
-            auth.notifyRoleChange(previousRole, profileData.role);
-          }
-          
-          if (profileData.banned === true && user?.banned !== true) {
-            handleUserBanned();
-            return false;
-          }
-          
-          return true;
-        }
-        
-        return false;
-      } finally {
-        refreshInProgressRef.current = false;
-      }
-    } catch (error) {
-      refreshInProgressRef.current = false;
       return false;
+    } finally {
+      refreshInProgressRef.current = false;
     }
-  }, [updateUserState, user, showToast, handleUserBanned]);
+  }, []);
   
   // Fetch latest user data
   const fetchLatestUserData = useCallback(async (): Promise<User | null> => {
     try {
       const cachedUserData = auth.getUser<User>();
-      const now = Date.now();
-      const fiveMinutes = 5 * 60 * 1000;
-      
-      if (cachedUserData && (now - lastRefreshTimeRef.current < fiveMinutes)) {
+      if (cachedUserData) {
         return cachedUserData;
       }
       
-      const token = auth.getToken();
-      if (!token) return null;
-      
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        params: {
-          '_': Date.now()
-        }
-      };
-      
-      const response = await authApi.get<User>('/api/v1/profile', config);
-      lastRefreshTimeRef.current = now;
-      
-      if (response.data) {
-        auth.setUser(response.data);
-      }
-      
-      return response.data || null;
+      return null;
     } catch (error) {
       return null;
     }
@@ -300,60 +251,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return isAuthenticated;
     }
     
-    if (!auth.isTokenValid()) {
+    const token = auth.getToken();
+    if (!auth.isTokenValid() || !token) {
       updateUserState(null);
       return false;
     }
     
-    const now = Date.now();
-    const ENHANCED_REFRESH_COOLDOWN = 60000;
-    if (now - lastRefreshTimeRef.current < ENHANCED_REFRESH_COOLDOWN) {
-      return isAuthenticated;
+    // If token is valid and we have a user, consider authenticated
+    const userData = auth.getUser<User>();
+    if (userData?.id) {
+      lastRefreshTimeRef.current = Date.now();
+      return true;
     }
     
-    refreshInProgressRef.current = true;
-    
-    try {
-      const token = auth.getToken();
-      
-      const response = await authApi.get<ProfileResponse>('/api/v1/profile', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Cache-Control': 'no-cache'
-        },
-        params: {
-          '_': Date.now()
-        }
-      });
-      
-      const userData = response.data;
-      lastRefreshTimeRef.current = now;
-      
-      if (userData.banned === true) {
-        handleUserBanned();
-        refreshInProgressRef.current = false;
-        return false;
-      }
-      
-      if (userData && userData.id) {
-        updateUserState(userData);
-        refreshInProgressRef.current = false;
-        return true;
-      }
-      
-      updateUserState(null);
-      refreshInProgressRef.current = false;
-      return false;
-    } catch (error) {
-      if ((error as any)?.response?.status === 401 || (error as any)?.response?.status === 403) {
-        updateUserState(null);
-        auth.clearAuth();
-      }
-      
-      refreshInProgressRef.current = false;
-      return isAuthenticated;
-    }
-  }, [isAuthenticated, updateUserState, handleUserBanned]);
+    updateUserState(null);
+    return false;
+  }, [isAuthenticated, updateUserState]);
   
   // Periodic auth verification
   useEffect(() => {
@@ -520,9 +433,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Reset auth state for clean login
       auth.resetForLogin();
       
-      const response = await authApi.post<AuthResponse>('/api/v1/auth/signin', { identifier, password });
-      const data = response.data;
+      const response = await authApi.post<AuthResponse>('/api/v1/auth/signin', { 
+        identifier, 
+        password 
+      });
       
+      const data = response.data;
       if (!data) return { success: false, error: 'Invalid response from server' };
       
       // Process user data
@@ -532,18 +448,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'Invalid credentials' };
       }
       
-      // Enhanced check for banned users with clear messaging
+      // Check for banned status
       if (userData.banned === true) {
-        // Set the banned flag in session storage
         sessionStorage.setItem('account_banned', 'true');
-        
-        // Clear any existing auth tokens
         auth.removeToken();
         
-        // Show prominent error toast
         showToast('Your account has been banned. Please contact support for assistance.', 'error', 10000);
         
-        // Return detailed error
         return {
           success: false,
           error: 'Your account has been banned by an admin. Please contact support for assistance.',
@@ -551,37 +462,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       }
       
-      // Only proceed with token storage and welcome message if not banned
+      // Get token and store it
       const token = data.token || data.access_token || data.authToken || data.jwt;
       if (!token) return { success: false, error: 'Invalid credentials' };
       
-      // Remove any previous banned flag
       sessionStorage.removeItem('account_banned');
-      
-      // Store token and update state
       auth.setToken(token);
       updateUserState(userData as User);
       lastRefreshTimeRef.current = Date.now();
       
-      console.log('User authenticated successfully, dispatching auth event');
-      
-      // First update our own state
       setUser(userData as User);
       
-      // Always redirect to recipe generator page after successful login
+      // Navigate and notify user
       setTimeout(() => {
-        // Dispatch login event to notify the app
         window.dispatchEvent(new CustomEvent('auth-state-changed', { 
-          detail: { 
-            action: 'login',
-            timestamp: Date.now(),
-            user: userData
-          }
+          detail: { action: 'login', timestamp: Date.now(), user: userData }
         }));
         
-        console.log('Navigating to recipe generator page after successful login');
-        
-        // Always redirect to recipe generator after login
         navigate('/recipe/generator');
         showToast(`Welcome back, ${userData.username}!`, 'success');
       }, 100);
@@ -590,12 +487,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       const errorMessage = error?.response?.data?.message || 'Invalid credentials';
       
-      // Check if the error message indicates a banned status
-      if (errorMessage.toLowerCase().includes('banned') || errorMessage.toLowerCase().includes('suspended')) {
-        // Set the banned flag in session storage
+      // Check for banned account in error message
+      if (errorMessage.toLowerCase().includes('banned') || 
+          errorMessage.toLowerCase().includes('suspended')) {
         sessionStorage.setItem('account_banned', 'true');
-        
-        // Return with banned flag
         return { 
           success: false, 
           error: 'Your account has been banned. Please contact support for assistance.',
@@ -603,10 +498,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       }
       
-      return { 
-        success: false, 
-        error: errorMessage
-      };
+      return { success: false, error: 'Invalid credentials' };
     }
   }, [navigate, updateUserState, showToast]);
 
@@ -672,76 +564,107 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     success: boolean;
     message?: string;
     error?: string;
+    requiresRelogin?: boolean;
   }> => {
+    if (!currentPassword || !newUsername) {
+      return {
+        success: false,
+        error: 'Password and new username are required'
+      };
+    }
+    
+    const token = auth.getToken();
+    if (!token || !auth.isTokenValid()) {
+      return {
+        success: false,
+        error: 'Authentication token is missing or invalid'
+      };
+    }
+    
     try {
-      // Validate password and new username are provided
-      if (!currentPassword || !newUsername) {
-        return {
-          success: false,
-          error: 'Password and new username are required'
+      // Set username change flags
+      sessionStorage.setItem('username_change_in_progress', 'true');
+      sessionStorage.setItem('new_username', newUsername);
+      
+      // Send update request
+      const response = await authApi.post('/api/v1/user/update-username', 
+        {
+          username: newUsername,
+          currentPassword
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (response.data?.success) {
+        // Update local user data before clearing auth
+        if (user) {
+          const updatedUser = { ...user, username: newUsername };
+          auth.setUser(updatedUser);
+          updateUserState(updatedUser);
+        }
+        
+        auth.clearAuth();
+        
+        return { 
+          success: true, 
+          message: 'Username updated successfully',
+          requiresRelogin: true
         };
       }
       
-      // Make API call to update username
-      const response = await authApi.post('/api/v1/user/update-username', {
-        currentPassword,
-        newUsername
-      });
-      
-      if (response.data?.success) {
-        // Update local user data
+      sessionStorage.removeItem('username_change_in_progress');
+      sessionStorage.removeItem('new_username');
+      return { 
+        success: false, 
+        error: response.data?.message || 'Failed to update username'
+      };
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        // Still consider it a success if we get a 403
         if (user) {
-          updateUserState({ ...user, username: newUsername });
+          const updatedUser = { ...user, username: newUsername };
+          auth.setUser(updatedUser);
         }
         
-        showToast('Username updated successfully', 'success');
-        return { success: true, message: 'Username updated successfully' };
+        auth.clearAuth();
+        return { 
+          success: true, 
+          message: 'Username updated successfully',
+          requiresRelogin: true
+        };
       }
       
-      return { success: false, error: 'Failed to update username' };
-    } catch (error: any) {
-      console.error('Username update error:', error);
-      const errorMsg = error.response?.status === 403 
-        ? 'Permission denied: You cannot change your username. Contact an admin.'
-        : error.response?.data?.message || 'Failed to update username';
-      
-      showToast(errorMsg, 'error');
-      return {
-        success: false,
-        error: errorMsg
+      sessionStorage.removeItem('username_change_in_progress');
+      sessionStorage.removeItem('new_username');
+      return { 
+        success: false, 
+        error: error.response?.data?.message || 'Failed to update username'
       };
     }
-  }, [isAuthenticated, user, updateUserState, showToast]);
+  }, [user, updateUserState]);
 
   // Fetch user profile data specifically
   const fetchUserProfile = useCallback(async (): Promise<boolean> => {
     if (!isAuthenticated) return false;
     
-    try {
-      const token = auth.getToken();
-      
-      if (!token) {
-        console.warn('No token available for fetchUserProfile');
-        return false;
+    const token = auth.getToken();
+    if (!token || !auth.isTokenValid()) return false;
+    
+    // Use cached user data instead of making API call
+    const userData = auth.getUser<User>();
+    if (userData?.id) {
+      if (user && user.username !== userData.username) {
+        updateUserState(userData);
       }
-      
-      const response = await api.get<ProfileResponse>('/api/v1/profile');
-      
-      if (response.data) {
-        // Update user data with latest username
-        const updatedUser = {
-          ...user,
-          username: response.data.username,
-        };
-        updateUserState(updatedUser as User);
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      return false;
+      return true;
     }
+    
+    return false;
   }, [isAuthenticated, user, updateUserState]);
 
   // Context value

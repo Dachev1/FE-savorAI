@@ -1,4 +1,5 @@
 import axios from './axiosConfig';
+import { recipeServiceAxios } from './axiosConfig';
 
 /**
  * Vote types for a recipe
@@ -20,7 +21,7 @@ export const VoteService = {
    */
   voteRecipe: async (recipeId: string, voteType: VoteType) => {
     try {
-      const response = await axios.post(`/api/v1/recipes/${recipeId}/vote`, {
+      const response = await recipeServiceAxios.post(`/v1/recipes/${recipeId}/vote`, {
         voteType
       });
       return response.data;

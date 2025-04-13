@@ -169,7 +169,7 @@ const SignIn = memo(() => {
     showToast(
       isBannedUser 
         ? 'Your account has been banned. Please contact support for assistance.' 
-        : errorMessage || 'Invalid credentials. Please check your username and password.',
+        : 'Invalid credentials',
       'error', 
       6000
     );
@@ -177,7 +177,7 @@ const SignIn = memo(() => {
     // Shake form and focus on identifier input
     applyShakeAnimation();
     setTimeout(() => identifierInputRef.current?.focus(), 100);
-  }, [showToast, applyShakeAnimation]);
+  }, [showToast]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -265,11 +265,10 @@ const SignIn = memo(() => {
         
         // For errors, show toast and provide visual feedback
         const errorMessage = result.error || 'Authentication failed';
-        setServerError(errorMessage);
         
-        // Dedicated handling for banned users
+        // Check if the error contains banned information
         const isBanned = errorMessage.toLowerCase().includes('banned') || 
-                         errorMessage.toLowerCase().includes('suspended');
+                        errorMessage.toLowerCase().includes('suspended');
         
         if (isBanned) {
           // Create a more prominent ban notification that persists
@@ -285,17 +284,42 @@ const SignIn = memo(() => {
           // Add banned session flag for UX consistency
           sessionStorage.setItem('account_banned', 'true');
         } else {
-          showToast(errorMessage, 'error', 5000);
+          // For security reasons, always show generic message
+          setServerError('Invalid credentials');
+          showToast('Invalid credentials', 'error', 5000);
         }
         
         // Visual feedback for error
         applyShakeAnimation();
       }
     } catch (error) {
-      // Handle unexpected errors
+      // Handle all errors the same way - use generic message for security
       console.error('Login error:', error);
-      setServerError('An unexpected error occurred. Please try again.');
-      showToast('An unexpected error occurred. Please try again.', 'error', 5000);
+      
+      // Check if the error contains banned information
+      const errorObj = error as any;
+      const errorMessage = errorObj?.response?.data?.message || '';
+      const isBanned = errorMessage.toLowerCase().includes('banned') || 
+                      errorMessage.toLowerCase().includes('suspended');
+                      
+      if (isBanned) {
+        // Create a more prominent ban notification that persists
+        setServerError(`
+          Your account has been banned by an admin. 
+          If you believe this is an error, please contact support with your account details.
+          All access to your account is restricted until this issue is resolved.
+        `);
+        
+        // Show toast with important styling
+        showToast('Account banned: Access restricted', 'error', 10000);
+        
+        // Add banned session flag for UX consistency
+        sessionStorage.setItem('account_banned', 'true');
+      } else {
+        // For security reasons, always show generic message
+        setServerError('Invalid credentials');
+        showToast('Invalid credentials', 'error', 5000);
+      }
       
       // Clear password for security
       setFormState(prev => ({ ...prev, password: '' }));

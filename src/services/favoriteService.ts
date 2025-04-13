@@ -1,5 +1,6 @@
 import axiosInstance from '../api/axiosConfig';
-import { RecipeResponse } from '../types/recipe';
+import { recipeServiceAxios } from '../api/axiosConfig';
+import type { RecipeResponse } from '../types/recipe';
 import { isAxiosError } from 'axios';
 
 /**
@@ -28,7 +29,7 @@ export const favoriteService = {
    */
   getFavorites: async () => {
     try {
-      const response = await axiosInstance.get('/api/v1/favorites/all');
+      const response = await recipeServiceAxios.get('/api/v1/favorites/all');
       return response.data;
     } catch (error: unknown) {
       // Only log real errors, not cancelled requests
@@ -63,12 +64,12 @@ export const favoriteService = {
       if (isCurrentlyFavorite) {
         console.log('[DEBUG-SERVICE] toggleFavorite: Removing from favorites');
         // If it's already a favorite, use DELETE to remove it
-        await axiosInstance.delete(`/api/v1/favorites/${recipeId}`);
+        await recipeServiceAxios.delete(`/api/v1/favorites/${recipeId}`);
         result = false;
       } else {
         console.log('[DEBUG-SERVICE] toggleFavorite: Adding to favorites');
         // If it's not a favorite, use POST to add it
-        const response = await axiosInstance.post(`/api/v1/favorites/${recipeId}`);
+        const response = await recipeServiceAxios.post(`/api/v1/favorites/${recipeId}`);
         console.log('[DEBUG-SERVICE] toggleFavorite: Add response:', response.data);
         result = true;
       }
@@ -104,7 +105,7 @@ export const favoriteService = {
     
     try {
       console.log('[DEBUG-SERVICE] checkFavorite: Checking status for recipeId:', recipeId);
-      const response = await axiosInstance.get(`/api/v1/favorites/check/${recipeId}`);
+      const response = await recipeServiceAxios.get(`/api/v1/favorites/check/${recipeId}`);
       console.log('[DEBUG-SERVICE] checkFavorite: Raw API response:', response.data);
       
       // Force boolean conversion to handle undefined/null responses
@@ -160,13 +161,13 @@ export const favoriteService = {
       // Convert ingredients array to comma-separated string
       const ingredientsString = recipe.ingredientsUsed.join(',');
       
-      // Ensure we have cooking time and difficulty
-      const cookingTime = recipe.cookingTimeMinutes || 30;
+      // Only use totalTimeMinutes for cooking time
+      const cookingTime = recipe.totalTimeMinutes || 30;
       const difficulty = recipe.difficulty || 'EASY';
       
       console.log('[DEBUG-SERVICE] saveGeneratedRecipe: Sending save request to API');
       // Save the recipe
-      const saveResponse = await axiosInstance.post('/api/v1/recipes/save', {
+      const saveResponse = await recipeServiceAxios.post('/api/v1/recipes/save', {
         title: recipe.mealName,
         ingredients: ingredientsString.split(',').filter(item => item.trim()),
         instructions,
@@ -189,7 +190,7 @@ export const favoriteService = {
       }
       
       console.log('[DEBUG-SERVICE] saveGeneratedRecipe: Marking recipe as favorite:', savedRecipeId);
-      await axiosInstance.post(`/api/v1/favorites/${savedRecipeId}`);
+      await recipeServiceAxios.post(`/api/v1/favorites/${savedRecipeId}`);
       console.log('[DEBUG-SERVICE] saveGeneratedRecipe: Recipe marked as favorite');
       
       return savedRecipeId;

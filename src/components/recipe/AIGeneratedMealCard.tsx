@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Modal from '../common/Modal/Modal';
 import { FaRegCopy, FaHeart, FaRegHeart, FaUtensils, FaList, FaClipboardList, FaInfoCircle, FaChevronRight, FaRobot, FaStar, FaMagic } from 'react-icons/fa';
-import { RecipeResponse, RecipeDetails } from '../../types/recipe';
+import type { RecipeResponse, RecipeDetails } from '../../types/recipe';
 
 interface AIGeneratedMealCardProps {
   recipe: RecipeResponse;

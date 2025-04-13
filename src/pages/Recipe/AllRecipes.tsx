@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../api/axiosConfig';
+import { recipeServiceAxios } from '../../api/axiosConfig';
 import { useAuth } from '../../context';
 import { LoadingSpinner } from '../../components/common';
 import { 
@@ -56,7 +57,7 @@ const AllRecipes: React.FC = () => {
   const fetchAllRecipes = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/v1/recipes/community');
+      const response = await recipeServiceAxios.get('/v1/recipes/community');
       setRecipes(response.data);
       setError(null);
     } catch (err) {
@@ -96,9 +97,9 @@ const AllRecipes: React.FC = () => {
       
       // Call the appropriate API endpoint based on the action
       if (newFavoriteStatus) {
-        await axios.post(`/api/v1/favorites/${recipeId}`);
+        await recipeServiceAxios.post(`/api/v1/favorites/${recipeId}`);
       } else {
-        await axios.delete(`/api/v1/favorites/${recipeId}`);
+        await recipeServiceAxios.delete(`/api/v1/favorites/${recipeId}`);
       }
     } catch (error) {
       console.error('Error toggling favorite status:', error);

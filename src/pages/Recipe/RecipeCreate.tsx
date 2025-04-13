@@ -852,9 +852,6 @@ const RecipeCreate: React.FC = () => {
                     <span className="font-medium">
                       {instructionsArray.length} {instructionsArray.length === 1 ? 'step' : 'steps'}
                     </span>
-                    <span className="text-amber-600 dark:text-amber-400 font-medium">
-                      Estimated cooking time: ~{Math.max(10, instructionsArray.length * 5)} minutes
-                    </span>
                   </div>
                 )}
               </FormSection>

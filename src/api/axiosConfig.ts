@@ -1,14 +1,28 @@
-import axios, { AxiosRequestConfig, AxiosResponse, AxiosError, CancelTokenSource } from 'axios';
+import axios from 'axios';
+import type { AxiosRequestConfig, AxiosResponse, AxiosError, CancelTokenSource } from 'axios';
 import auth from '../utils/auth';
 
 // Track in-flight requests
 const pendingRequests = new Map<string, CancelTokenSource>();
 
 /**
- * Centralized API configuration with interceptors
+ * Centralized API configuration with interceptors for the User Service (port 8081)
  */
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL, 
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8081', 
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  },
+  timeout: 30000 // 30 second timeout
+});
+
+/**
+ * Separate axios instance for the Recipe Service (port 8082)
+ */
+export const recipeServiceAxios = axios.create({
+  baseURL: 'http://localhost:8082',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -22,6 +36,16 @@ axiosInstance.cancelPendingRequests = () => {
   pendingRequests.forEach((source, key) => {
     source.cancel('Operation canceled due to new request');
     pendingRequests.delete(key);
+  });
+};
+
+// Same for recipe service instance
+recipeServiceAxios.cancelPendingRequests = () => {
+  pendingRequests.forEach((source, key) => {
+    if (key.includes('recipe-service')) {
+      source.cancel('Operation canceled due to new request');
+      pendingRequests.delete(key);
+    }
   });
 };
 
@@ -44,113 +68,119 @@ const triggerAuthStateChanged = (detail = {}) => {
 };
 
 // Request interceptor: add auth headers, deduplicate requests
-axiosInstance.interceptors.request.use(
-  async (config) => {
-    // Identify public endpoints
-    const isPublicEndpoint = 
-      config.url?.includes('/auth/') || 
-      config.url?.includes('/public/') ||
-      (config.url?.includes('/users') && config.method === 'post');
-    
-    // Special case for logout requests 
-    const isLogoutRequest = config.url?.includes('/auth/logout');
-    
-    // Handle duplicate requests
-    const requestKey = `${config.method}-${config.url}-${JSON.stringify(config.params || {})}`;
-    
-    if (pendingRequests.has(requestKey) && !isLogoutRequest) {
-      const source = pendingRequests.get(requestKey)!;
-      source.cancel('Previous duplicate request cancelled');
-      pendingRequests.delete(requestKey);
-    }
-    
-    // Create cancel token for this request
-    const source = axios.CancelToken.source();
-    config.cancelToken = config.cancelToken || source.token;
-    pendingRequests.set(requestKey, source);
-    
-    // Add cleanup function
-    const originalComplete = config.onComplete;
-    config.onComplete = () => {
-      pendingRequests.delete(requestKey);
-      if (originalComplete) originalComplete();
-    };
-    
-    // Add auth token for protected endpoints
-    if (!isPublicEndpoint || isLogoutRequest) {
-      if (!auth.isTokenValid() && !isLogoutRequest) {
-        source.cancel('No valid authentication');
-        return Promise.reject({ cancelled: true });
+const setupInterceptors = (instance: typeof axiosInstance, servicePrefix = '') => {
+  instance.interceptors.request.use(
+    async (config) => {
+      // Identify public endpoints
+      const isPublicEndpoint = 
+        config.url?.includes('/auth/') || 
+        config.url?.includes('/public/') ||
+        (config.url?.includes('/users') && config.method === 'post');
+      
+      // Special case for logout requests 
+      const isLogoutRequest = config.url?.includes('/auth/logout');
+      
+      // Handle duplicate requests
+      const requestKey = `${servicePrefix}-${config.method}-${config.url}-${JSON.stringify(config.params || {})}`;
+      
+      if (pendingRequests.has(requestKey) && !isLogoutRequest) {
+        const source = pendingRequests.get(requestKey)!;
+        source.cancel('Previous duplicate request cancelled');
+        pendingRequests.delete(requestKey);
       }
       
-      const token = auth.getToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-    
-    return config;
-  },
-  error => Promise.reject(error)
-);
-
-// Response interceptor: handle errors, tokens, and cleanup
-axiosInstance.interceptors.response.use(
-  (response: AxiosResponse) => {
-    // Clean up request tracking
-    if (response.config.onComplete) {
-      response.config.onComplete();
-    }
-    
-    // Process auth tokens
-    const authToken = response.data?.token || 
-                     response.headers['x-auth-token'] || 
-                     response.headers['authorization'] ||
-                     response.headers['Authorization'];
-                     
-    if (authToken) {
-      const rawToken = authToken.startsWith('Bearer ') 
-        ? authToken.substring(7) 
-        : authToken;
+      // Create cancel token for this request
+      const source = axios.CancelToken.source();
+      config.cancelToken = config.cancelToken || source.token;
+      pendingRequests.set(requestKey, source);
+      
+      // Add cleanup function
+      const originalComplete = config.onComplete;
+      config.onComplete = () => {
+        pendingRequests.delete(requestKey);
+        if (originalComplete) originalComplete();
+      };
+      
+      // Add auth token for protected endpoints
+      if (!isPublicEndpoint || isLogoutRequest) {
+        if (!auth.isTokenValid() && !isLogoutRequest) {
+          source.cancel('No valid authentication');
+          return Promise.reject({ cancelled: true });
+        }
         
-      auth.setToken(rawToken);
+        const token = auth.getToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+      }
+      
+      return config;
+    },
+    error => Promise.reject(error)
+  );
+
+  // Response interceptor: handle errors, tokens, and cleanup
+  instance.interceptors.response.use(
+    (response: AxiosResponse) => {
+      // Clean up request tracking
+      if (response.config.onComplete) {
+        response.config.onComplete();
+      }
+      
+      // Process auth tokens
+      const authToken = response.data?.token || 
+                      response.headers['x-auth-token'] || 
+                      response.headers['authorization'] ||
+                      response.headers['Authorization'];
+                      
+      if (authToken) {
+        const rawToken = authToken.startsWith('Bearer ') 
+          ? authToken.substring(7) 
+          : authToken;
+          
+        auth.setToken(rawToken);
+      }
+      
+      return response;
+    },
+    (error: any) => {
+      // Clean up request tracking
+      if (error.config?.onComplete) {
+        error.config.onComplete();
+      }
+      
+      // Handle cancelled requests
+      if (axios.isCancel(error) || error.cancelled) {
+        return Promise.reject({
+          isCancel: true,
+          isCancelled: true,
+          message: error.message || 'Request cancelled'
+        });
+      }
+      
+      // Handle network errors
+      if (!error.response) {
+        window.dispatchEvent(new CustomEvent('api-network-error', {
+          detail: { message: error.message }
+        }));
+      }
+      
+      // Handle auth errors
+      if (error.response?.status === 401) {
+        auth.removeToken();
+        triggerAuthStateChanged({ reason: 'unauthorized' });
+      } 
+      else if (error.response?.status === 403 && !error.config?.url?.includes('/profile')) {
+        triggerAuthStateChanged({ reason: 'forbidden' });
+      }
+      
+      return Promise.reject(error);
     }
-    
-    return response;
-  },
-  (error: any) => {
-    // Clean up request tracking
-    if (error.config?.onComplete) {
-      error.config.onComplete();
-    }
-    
-    // Handle cancelled requests
-    if (axios.isCancel(error) || error.cancelled) {
-      return Promise.reject({
-        isCancel: true,
-        isCancelled: true,
-        message: error.message || 'Request cancelled'
-      });
-    }
-    
-    // Handle network errors
-    if (!error.response) {
-      window.dispatchEvent(new CustomEvent('api-network-error', {
-        detail: { message: error.message }
-      }));
-    }
-    
-    // Handle auth errors
-    if (error.response?.status === 401) {
-      auth.removeToken();
-      triggerAuthStateChanged({ reason: 'unauthorized' });
-    } 
-    else if (error.response?.status === 403 && !error.config?.url?.includes('/profile')) {
-      triggerAuthStateChanged({ reason: 'forbidden' });
-    }
-    
-    return Promise.reject(error);
-  }
-);
+  );
+};
+
+// Apply interceptors to both instances
+setupInterceptors(axiosInstance, 'user-service');
+setupInterceptors(recipeServiceAxios, 'recipe-service');
 
 export default axiosInstance; 

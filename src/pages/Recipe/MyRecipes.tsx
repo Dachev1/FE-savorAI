@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../api/axiosConfig';
+import { recipeServiceAxios } from '../../api/axiosConfig';
 import { useAuth } from '../../context';
 import { LoadingSpinner } from '../../components/common';
 import { 
@@ -60,7 +61,7 @@ const MyRecipes: React.FC = () => {
     
     setLoading(true);
     try {
-      const response = await axios.get('/v1/recipes/my-recipes');
+      const response = await recipeServiceAxios.get('/v1/recipes/my-recipes');
       setRecipes(response.data);
       setError(null);
     } catch (err) {

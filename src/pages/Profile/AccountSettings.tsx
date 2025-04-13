@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useCallback, ChangeEvent, FormEvent, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import { FiUser, FiEdit3 } from 'react-icons/fi';
 import { useAuth, useToast } from '../../context';
 import { AnimatePresence } from 'framer-motion';
 import { ProfileCard, TabContainer } from '../../components/common';
+import auth from '../../utils/auth';
 
 // Profile information interface
 interface ProfileFormState {
@@ -24,22 +26,17 @@ interface ErrorState {
 
 type TabType = 'profile' | 'username';
 
-const TABS: Array<{id: TabType, label: string, icon: React.ReactNode}> = [
-  { id: 'profile', label: 'Profile', icon: <FiUser size={22} /> },
-  { id: 'username', label: 'Change Username', icon: <FiEdit3 size={22} /> }
+const TABS = [
+  { id: 'profile' as TabType, label: 'Profile', icon: <FiUser size={22} /> },
+  { id: 'username' as TabType, label: 'Change Username', icon: <FiEdit3 size={22} /> }
 ];
 
 const AccountSettings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('profile');
+  const [loading, setLoading] = useState(false);
   
-  const { user, updateUsername, isLoading, fetchUserProfile } = useAuth();
-  const toastContext = useToast();
-  
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', duration?: number) => {
-    if (toastContext) {
-      toastContext.showToast(message, type, duration);
-    }
-  }, [toastContext]);
+  const { user, updateUsername } = useAuth();
+  const { showToast } = useToast();
   
   const [profile, setProfile] = useState<ProfileFormState>({
     username: '',
@@ -74,7 +71,12 @@ const AccountSettings: React.FC = () => {
   const handleTabChange = useCallback((tab: TabType) => {
     resetForms();
     setActiveTab(tab);
-  }, [resetForms]);
+    
+    // Show toast notification when user enters the Change Username tab
+    if (tab === 'username') {
+      showToast('Enter your new username and current password to update your profile', 'info');
+    }
+  }, [resetForms, showToast]);
   
   const handleUsernameFormChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -82,9 +84,12 @@ const AccountSettings: React.FC = () => {
     setErrors(prev => ({ ...prev, [id]: '' }));
   }, []);
   
-  const validateUsernameForm = useCallback((): boolean => {
-    let isValid = true;
+  const handleUsernameSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    // Validate form
     const newErrors: ErrorState = { newUsername: '', password: '' };
+    let isValid = true;
     
     if (!usernameForm.newUsername) {
       newErrors.newUsername = 'Username is required';
@@ -98,40 +103,88 @@ const AccountSettings: React.FC = () => {
     }
     
     if (!usernameForm.password) {
-      newErrors.password = 'Password is required to confirm changes';
+      newErrors.password = 'Password is required';
       isValid = false;
     }
     
-    setErrors(newErrors);
-    return isValid;
-  }, [usernameForm, profile.username]);
-  
-  const handleUsernameSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateUsernameForm()) return;
-    
-    const result = await updateUsername(usernameForm.password, usernameForm.newUsername);
-    
-    if (result.success) {
-      showToast(result.message || 'Username updated successfully', 'success');
-      resetForms();
-      setActiveTab('profile');
-    } else {
-      showToast(result.error || 'Failed to update username', 'error');
+    if (!isValid) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setLoading(true);
+    const oldUsername = user?.username;
+    const newUsername = usernameForm.newUsername;
+
+    // Create a redirect overlay
+    const showOverlay = () => {
+      if (document.getElementById('redirect-overlay')) return;
       
-      if (result.error?.toLowerCase().includes('password')) {
-        setErrors(prev => ({ ...prev, password: result.error || 'Invalid password' }));
+      const overlay = document.createElement('div');
+      overlay.id = 'redirect-overlay';
+      overlay.className = 'fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/70 text-white text-lg text-center p-5';
+      
+      const message = document.createElement('div');
+      message.innerHTML = 'Username successfully updated!<br>Redirecting to login page...';
+      
+      const spinner = document.createElement('div');
+      spinner.className = 'w-10 h-10 my-5 mx-auto rounded-full border-4 border-white/30 border-t-blue-500 animate-spin';
+      
+      overlay.appendChild(message);
+      overlay.appendChild(spinner);
+      document.body.appendChild(overlay);
+    };
+    
+    const removeOverlay = () => {
+      const overlay = document.getElementById('redirect-overlay');
+      if (overlay) document.body.removeChild(overlay);
+    };
+
+    try {
+      showOverlay();
+      const result = await updateUsername(usernameForm.password, newUsername);
+      
+      if (result.success) {
+        showToast(`Username changed from "${oldUsername}" to "${newUsername}". You will need to log in again.`, "success", 5000);
+        resetForms();
+        
+        if (result.requiresRelogin) {
+          // Use a shorter delay for better UX
+          setTimeout(() => {
+            sessionStorage.setItem('username_changed', 'true');
+            sessionStorage.removeItem('username_change_in_progress');
+            window.location.href = '/signin';
+          }, 800);
+        } else {
+          removeOverlay();
+          setActiveTab('profile');
+        }
+      } else {
+        removeOverlay();
+        showToast(result.error || "Failed to update username", "error");
       }
+    } catch (error: any) {
+      removeOverlay();
+      
+      // Handle cancelled requests specifically
+      if (error.isCancel || error.isCancelled) {
+        showToast("Your request was cancelled. Please try again.", "warning");
+      } else {
+        showToast(error.message || "An unexpected error occurred", "error");
+      }
+    } finally {
+      setLoading(false);
     }
   };
   
-  // Memoized UI components
-  const buttonClass = useMemo(() => "w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 items-center", []);
+  // UI component classes
+  const buttonClass = "w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 items-center";
   
-  const inputClass = useCallback((error: string) => `appearance-none block w-full px-3 py-2 border ${
-    error ? 'border-red-300' : 'border-gray-300 dark:border-gray-600'
-  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white`, []);
+  const inputClass = useCallback((error: string) => 
+    `appearance-none block w-full px-3 py-2 border ${
+      error ? 'border-red-300' : 'border-gray-300 dark:border-gray-600'
+    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white`, 
+  []);
   
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
@@ -218,10 +271,10 @@ const AccountSettings: React.FC = () => {
               <div>
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={loading}
                   className={buttonClass}
                 >
-                  {isLoading ? 'Updating...' : 'Update Username'}
+                  {loading ? 'Updating...' : 'Update Username'}
                 </button>
               </div>
             </form>

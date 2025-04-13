@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context';
 import axios from '../../api/axiosConfig';
+import { recipeServiceAxios } from '../../api/axiosConfig';
 import { FaUser, FaClock, FaTrash, FaPaperPlane } from 'react-icons/fa';
 
 interface Comment {
@@ -13,15 +14,19 @@ interface Comment {
 
 interface CommentListProps {
   recipeId: string;
+  authorId?: string;
 }
 
-const CommentList: React.FC<CommentListProps> = ({ recipeId }) => {
+const CommentList: React.FC<CommentListProps> = ({ recipeId, authorId }) => {
   const { user, isAuthenticated } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Check if current user is the recipe owner
+  const isRecipeOwner = user && authorId && user.id === authorId;
 
   // Fetch comments for the recipe
   const fetchComments = useCallback(async () => {
@@ -31,7 +36,7 @@ const CommentList: React.FC<CommentListProps> = ({ recipeId }) => {
     setError(null);
     
     try {
-      const response = await axios.get(`/v1/comments/${recipeId}`);
+      const response = await recipeServiceAxios.get(`/v1/comments/${recipeId}`);
       setComments(response.data || []);
     } catch (err) {
       console.error('Failed to fetch comments:', err);
@@ -55,6 +60,11 @@ const CommentList: React.FC<CommentListProps> = ({ recipeId }) => {
       return;
     }
     
+    if (isRecipeOwner) {
+      setError('You cannot comment on your own recipe.');
+      return;
+    }
+    
     if (!newComment.trim()) {
       return;
     }
@@ -63,7 +73,7 @@ const CommentList: React.FC<CommentListProps> = ({ recipeId }) => {
     setError(null);
     
     try {
-      const response = await axios.post('/v1/comments', {
+      const response = await recipeServiceAxios.post('/v1/comments', {
         recipeId,
         content: newComment.trim()
       });
@@ -86,7 +96,7 @@ const CommentList: React.FC<CommentListProps> = ({ recipeId }) => {
     if (!isAuthenticated) return;
     
     try {
-      await axios.delete(`/v1/comments/${commentId}`);
+      await recipeServiceAxios.delete(`/v1/comments/${commentId}`);
       
       // Remove the deleted comment from the list
       setComments(prevComments => 
@@ -117,7 +127,7 @@ const CommentList: React.FC<CommentListProps> = ({ recipeId }) => {
       </div>
       
       {/* Comment form */}
-      {isAuthenticated && (
+      {isAuthenticated && !isRecipeOwner ? (
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <form onSubmit={handleSubmitComment} className="flex flex-col">
             <textarea
@@ -143,6 +153,14 @@ const CommentList: React.FC<CommentListProps> = ({ recipeId }) => {
               </button>
             </div>
           </form>
+        </div>
+      ) : isRecipeOwner ? (
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 text-center text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700">
+          <p>You cannot comment on your own recipe</p>
+        </div>
+      ) : (
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 text-center">
+          <p className="text-gray-600 dark:text-gray-400">Please sign in to leave a comment</p>
         </div>
       )}
       

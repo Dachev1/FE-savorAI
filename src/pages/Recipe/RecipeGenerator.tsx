@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { AxiosError, isAxiosError } from 'axios';
 import RecipeCard from '../../components/recipe/AIGeneratedMealCard';
 import IngredientsInput from '../../components/GeneratorIngredientsInput';
-import { NutritionalInformation } from '../../types/recipe';
+import type { NutritionalInformation } from '../../types/recipe';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 import { useToast } from '../../context';
@@ -28,6 +28,7 @@ interface RecipeResponse {
   imageUrl: string;
   aiGenerated?: boolean;
   cookingTimeMinutes?: number;
+  totalTimeMinutes?: number;
   difficulty?: string;
 }
 
@@ -50,9 +51,9 @@ const RecipeGenerator: React.FC = () => {
     const updatedRecipe = { ...recipe };
     
     // Only generate cooking time if it doesn't exist or is invalid
-    if (!updatedRecipe.cookingTimeMinutes || updatedRecipe.cookingTimeMinutes <= 0) {
+    if (!updatedRecipe.totalTimeMinutes || updatedRecipe.totalTimeMinutes <= 0) {
       const randomCookingTime = Math.floor(Math.random() * 30) + 15; // 15-45 minutes
-      updatedRecipe.cookingTimeMinutes = randomCookingTime;
+      updatedRecipe.totalTimeMinutes = randomCookingTime;
     }
     
     // Set difficulty level if not provided - 70% EASY, 20% MEDIUM, 10% HARD
@@ -151,7 +152,7 @@ Fat: ${details.nutritionalInformation.fat}
     const recipeToSave = ensureRecipeMetadata({...recipe});
     
     // Update recipe state if metadata was added or changed
-    if (recipeToSave.cookingTimeMinutes !== recipe.cookingTimeMinutes || 
+    if (recipeToSave.totalTimeMinutes !== recipe.totalTimeMinutes || 
         recipeToSave.difficulty !== recipe.difficulty) {
       setRecipe(recipeToSave);
     }
@@ -333,8 +334,8 @@ Fat: ${details.nutritionalInformation.fat}
           ingredientsUsed: data.ingredients || [],
           imageUrl: data.imageUrl || '',
           aiGenerated: true,
-          // Use totalTimeMinutes as primary source for cooking time
-          cookingTimeMinutes: data.totalTimeMinutes || data.cookingTimeMinutes || data.prepTimeMinutes,
+          // Use totalTimeMinutes directly
+          totalTimeMinutes: data.totalTimeMinutes,
           difficulty: data.difficulty,
           recipeDetails: {
             ingredientsList: data.ingredients || [],
@@ -361,18 +362,16 @@ Fat: ${details.nutritionalInformation.fat}
         console.log('[RecipeGenerator] Recipe data mapping details:', { 
           originalData: {
             totalTimeMinutes: data.totalTimeMinutes,
-            cookingTimeMinutes: data.cookingTimeMinutes, 
-            prepTimeMinutes: data.prepTimeMinutes,
             difficulty: data.difficulty
           },
           mappedData: {
-            cookingTimeMinutes: recipeData.cookingTimeMinutes,
+            totalTimeMinutes: recipeData.totalTimeMinutes,
             difficulty: recipeData.difficulty
           },
           enrichedData: {
-            cookingTimeMinutes: enrichedRecipeData.cookingTimeMinutes,
+            totalTimeMinutes: enrichedRecipeData.totalTimeMinutes,
             difficulty: enrichedRecipeData.difficulty,
-            wasEnriched: enrichedRecipeData.cookingTimeMinutes !== recipeData.cookingTimeMinutes || 
+            wasEnriched: enrichedRecipeData.totalTimeMinutes !== recipeData.totalTimeMinutes || 
                          enrichedRecipeData.difficulty !== recipeData.difficulty
           }
         });

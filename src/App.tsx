@@ -222,11 +222,20 @@ function App() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        if (!auth.isTokenValid()) {
+        setIsInitializing(true);
+        
+        // Check if a username change was in progress but not completed
+        const usernameChangeInProgress = sessionStorage.getItem('username_change_in_progress') === 'true';
+        if (usernameChangeInProgress) {
+          // Clear the flag and redirect to signin page
+          sessionStorage.removeItem('username_change_in_progress');
+          auth.clearAuth();
+          navigate('/signin');
           setIsInitializing(false);
           return;
         }
-
+        
+        // Prevent excessive refreshes
         const now = Date.now();
         if (now - lastRefreshTime.current < MIN_REFRESH_INTERVAL && user) {
           setIsInitializing(false);
@@ -237,15 +246,20 @@ function App() {
           setIsInitializing(false);
         }, 3000);
 
-        await refreshUserData();
-
-        lastRefreshTime.current = Date.now();
-        lastRoleVerificationTime.current = Date.now();
-        
-        clearTimeout(initTimeout);
+        try {
+          // Check if token is valid but we don't need to fetch profile
+          if (auth.isTokenValid()) {
+            lastRefreshTime.current = Date.now();
+            lastRoleVerificationTime.current = Date.now();
+          } else {
+            auth.clearAuth();
+          }
+        } finally {
+          clearTimeout(initTimeout);
+          setIsInitializing(false);
+        }
       } catch (error) {
         console.error('Error during initialization:', error);
-      } finally {
         setIsInitializing(false);
       }
     };
@@ -256,7 +270,7 @@ function App() {
     return () => {
       window.removeEventListener('auth-state-changed', handleAuthStateChange);
     };
-  }, [handleAuthStateChange, refreshUserData, user]);
+  }, [handleAuthStateChange, refreshUserData, user, navigate]);
   
   // Handle network status changes
   useEffect(() => {

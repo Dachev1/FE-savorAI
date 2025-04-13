@@ -35,6 +35,8 @@ export interface NutritionalInformation {
     instructions?: string;
     aiGenerated?: boolean;
     totalTimeMinutes?: number;
+    cookingTimeMinutes?: number;
+    prepTimeMinutes?: number;
     difficulty?: string;
     macros?: Macros;
     author?: {

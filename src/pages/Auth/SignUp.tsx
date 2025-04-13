@@ -13,7 +13,7 @@ const CONTENT_DELAY = 150; // Delay content for staggered effect
 
 // Interface for registration error
 interface RegistrationError {
-  type: 'email' | 'username';
+  type: 'email' | 'username' | 'password';
   message: string;
   email: string;
   timestamp: number;
@@ -238,7 +238,7 @@ const SignUp = () => {
   }, []);
   
   // Handler functions
-  const handleInput = useCallback((field: keyof typeof formData, errorType?: 'username' | 'email') => 
+  const handleInput = useCallback((field: keyof typeof formData, errorType?: 'username' | 'email' | 'password') => 
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setFormData(prev => ({ ...prev, [field]: e.target.value }));
       
@@ -265,110 +265,80 @@ const SignUp = () => {
   }, []);
   
   const isDuplicateUserError = useCallback((error: any) => {
-    // Check for HTTP 409 Conflict status or specific error types
-    const hasConflictStatus = error.response?.status === 409;
-    const hasTypeField = error.type === 'username' || error.type === 'email';
+    // Status or type check
+    if (error.response?.status === 409 || error.type === 'username' || error.type === 'email') {
+      return true;
+    }
     
-    // Check for specific message patterns in error message or response data
-    let hasDuplicateMessage = false;
+    // Check message for duplicate indicators
+    const patterns = ['username already', 'email already', 'already taken', 'duplicate user', 
+                      'already registered', 'email already registered'];
     
-    // Check the error message itself
+    // Check error message
     if (error.message) {
       const message = error.message.toLowerCase();
-      hasDuplicateMessage = 
-        message.includes('username already') || 
-        message.includes('email already') ||
-        message.includes('already taken') ||
-        message.includes('duplicate user') ||
-        message.includes('registration failed - duplicate user') ||
-        message.includes('already registered') ||
-        message.includes('email already registered');
+      if (patterns.some(pattern => message.includes(pattern))) {
+        return true;
+      }
     }
     
-    // Also check the response data message if present
+    // Check response data message
     if (error.response?.data?.message) {
       const message = error.response.data.message.toLowerCase();
-      hasDuplicateMessage = hasDuplicateMessage || 
-        message.includes('username already') || 
-        message.includes('email already') ||
-        message.includes('already taken') ||
-        message.includes('duplicate user') ||
-        message.includes('registration failed - duplicate user') ||
-        message.includes('already registered') ||
-        message.includes('email already registered');
+      if (patterns.some(pattern => message.includes(pattern))) {
+        return true;
+      }
     }
     
-    // Check for raw string response
+    // Check raw string response
     if (error.response?.data && typeof error.response.data === 'string') {
       const message = error.response.data.toLowerCase();
-      hasDuplicateMessage = hasDuplicateMessage || 
-        message.includes('username already') || 
-        message.includes('email already') ||
-        message.includes('already taken') ||
-        message.includes('duplicate user') ||
-        message.includes('registration failed - duplicate user') ||
-        message.includes('already registered') ||
-        message.includes('email already registered');
+      if (patterns.some(pattern => message.includes(pattern))) {
+        return true;
+      }
     }
     
-    return hasConflictStatus || hasTypeField || hasDuplicateMessage;
+    return false;
   }, []);
   
   // Update processRegistrationError to handle all error cases with minimal code
   const processRegistrationError = useCallback((error: any) => {
     // Default values
-    let errorType: 'username' | 'email' = 'username';
+    let errorType: 'username' | 'email' | 'password' = 'username';
     let errorMessage = '';
     
-    // Extract error data from various possible formats
-    if (error) {
-      // Case 1: Error already has type info (from AuthContext)
-      if (error.type === 'username' || error.type === 'email') {
+    // Extract error information
+    if (typeof error === 'object') {
+      // Use provided type if available
+      if (error.type === 'username' || error.type === 'email' || error.type === 'password') {
         errorType = error.type;
-        errorMessage = error.friendlyMessage || error.message || 'This username or email is already in use';
-        
-        // Skip further processing if we have complete data
-        if (errorMessage) {
-          setRegistrationError({
-            type: errorType,
-            message: errorMessage,
-            email: formData.email,
-            timestamp: Date.now()
-          });
-          
-          try {
-            sessionStorage.setItem('registrationError', JSON.stringify({
-              type: errorType,
-              message: errorMessage,
-              email: formData.email,
-              timestamp: Date.now()
-            }));
-          } catch (e) {
-            // Silent fail for storage errors
-          }
-          
-          return;
-        }
-      }
-      
-      // Case 2: Extract error message from various sources
-      errorMessage = error.message || 
-                    (error.response?.data?.message) || 
-                    (typeof error.response?.data === 'string' ? error.response.data : '') ||
-                    'Registration failed';
-      
-      // Determine if it's a username or email error based on the message
-      const message = errorMessage.toLowerCase();
-      if (message.includes('email')) {
-        errorType = 'email';
-        errorMessage = `Email "${formData.email}" is already registered. Please sign in or use a different email.`;
+        errorMessage = error.message || '';
       } else {
-        errorType = 'username';
-        errorMessage = `Username "${formData.username}" is already taken. Please choose another.`;
+        // Extract message from various sources
+        errorMessage = error.message || 
+                      error.response?.data?.message || 
+                      (typeof error.response?.data === 'string' ? error.response.data : '') ||
+                      'Registration failed';
+        
+        // Determine type from message content
+        const message = errorMessage.toLowerCase();
+        if (message.includes('email')) {
+          errorType = 'email';
+          if (!error.message) {
+            errorMessage = `Email "${formData.email}" is already registered. Please sign in or use a different email.`;
+          }
+        } else if (message.includes('password')) {
+          errorType = 'password';
+        } else {
+          errorType = 'username';
+          if (!error.message) {
+            errorMessage = `Username "${formData.username}" is already taken. Please choose another.`;
+          }
+        }
       }
     }
     
-    // Create the registration error object
+    // Create error object
     const registrationErr: RegistrationError = {
       type: errorType,
       message: errorMessage,
@@ -376,14 +346,12 @@ const SignUp = () => {
       timestamp: Date.now()
     };
     
-    // Update state with the error
+    // Update state and store in session
     setRegistrationError(registrationErr);
-    
-    // Store in session storage for persistence across page reloads
     try {
       sessionStorage.setItem('registrationError', JSON.stringify(registrationErr));
     } catch (e) {
-      // Silent fail
+      // Silent fail for storage errors
     }
   }, [formData.username, formData.email]);
   
@@ -391,6 +359,8 @@ const SignUp = () => {
     setTimeout(() => {
       if (errorType === 'email') {
         document.getElementById('email')?.focus();
+      } else if (errorType === 'password') {
+        document.getElementById('password')?.focus();
       } else {
         usernameInputRef.current?.focus();
       }
@@ -428,51 +398,43 @@ const SignUp = () => {
       
       // Only handle errors here - successful signup navigation is handled in AuthContext
       if (!result.success) {
-        // If signup returned success: false, it means there was an error
-        // Log for debugging in development
         if (import.meta.env.DEV) {
           console.warn('Signup failed:', result);
         }
         
-        // The signup function in AuthContext already shows toast messages
-        // We just need to handle the UI effects like shake animation
         applyShakeAnimation();
         
-        // For duplicate user errors, we should show the error in the form
-        if (result.error) {
-          const errorMsg = result.error.toLowerCase();
-          
-          // Check for specific Spring backend error patterns
-          if (errorMsg.includes('username already taken') || 
-              errorMsg.includes('already taken: ' + username) ||
-              errorMsg.includes('duplicate user: username already taken')) {
-            // Create and process a username error
-            const error = { 
-              type: 'username', 
-              message: `Username "${username}" is already taken. Please try another.` 
-            };
-            processRegistrationError(error);
-            focusErrorField('username');
-          } else if (errorMsg.includes('email')) {
-            // Create and process an email error
-            const error = { 
-              type: 'email', 
-              message: `Email "${email}" is already registered. Please sign in or use a different email.` 
-            };
-            processRegistrationError(error);
-            focusErrorField('email');
-          } else {
-            // Generic duplicate error without specifics
-            const error = { 
-              type: 'username', // Default to username for generic errors
-              message: result.error 
-            };
-            processRegistrationError(error);
-            focusErrorField('username');
-          }
+        if (!result.error) {
+          showToast('Registration failed. Please try again.', 'error');
+          return;
+        }
+        
+        const errorMsg = result.error.toLowerCase();
+        
+        // Handle different error types
+        if (errorMsg.includes('username already taken') || 
+            errorMsg.includes('already taken: ' + username) ||
+            errorMsg.includes('duplicate user: username already taken')) {
+          processRegistrationError({ 
+            type: 'username', 
+            message: `Username "${username}" is already taken. Please try another.` 
+          });
+          focusErrorField('username');
+        } else if (errorMsg.includes('email')) {
+          processRegistrationError({ 
+            type: 'email', 
+            message: `Email "${email}" is already registered. Please sign in or use a different email.` 
+          });
+          focusErrorField('email');
+        } else if (errorMsg.includes('password')) {
+          showToast(result.error, 'error');
+          setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
+          setTimeout(() => document.getElementById('password')?.focus(), 100);
+        } else {
+          showToast(result.error, 'error');
+          setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
         }
       }
-      // If successful, the signup function in AuthContext handles navigation
     } catch (error: any) {
       // Clear sensitive data on error
       setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
@@ -483,7 +445,6 @@ const SignUp = () => {
         applyShakeAnimation();
         focusErrorField(error.type);
       } else {
-        // Generic error handling
         showToast(error.friendlyMessage || 'Registration failed. Please try again.', 'error');
       }
     } finally {
@@ -606,8 +567,12 @@ const SignUp = () => {
                       id="password"
                       type={showPassword ? "text" : "password"}
                       value={password}
-                      onChange={handleInput('password')}
-                      className="w-full px-4 py-2.5 pl-10 pr-10 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                      onChange={handleInput('password', 'password')}
+                      className={`w-full px-4 py-2.5 pl-10 pr-10 rounded-xl border ${
+                        registrationError?.type === 'password' 
+                          ? 'border-red-500 focus:ring-red-200' 
+                          : 'border-gray-200 dark:border-gray-700 focus:ring-blue-200'
+                      } bg-white dark:bg-gray-800 focus:border-blue-500 focus:ring-2 transition-all`}
                       placeholder="••••••••"
                       required
                       autoComplete="new-password"
@@ -623,6 +588,13 @@ const SignUp = () => {
                       </button>
                     </div>
                   </div>
+                  <ul className="mt-1 text-xs text-gray-500 dark:text-gray-400 space-y-0.5 list-disc pl-4">
+                    <li>At least 8 characters</li>
+                    <li>Include uppercase letter (A-Z)</li>
+                    <li>Include lowercase letter (a-z)</li>
+                    <li>Include number (0-9)</li>
+                    <li>Include special character (!@#$%^&*)</li>
+                  </ul>
                 </div>
                 
                 {/* Confirm Password Field */}
@@ -700,8 +672,5 @@ const SignUp = () => {
   );
 };
 
-// Set display name for dev tools
-SignUp.displayName = 'SignUp';
-
-// Export a memoized version (only memoize once)
+// Export a memoized version
 export default React.memo(SignUp);

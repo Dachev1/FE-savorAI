@@ -476,7 +476,7 @@ const Navbar: React.FC = memo(() => {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -10, scale: 0.95 }}
                     transition={{ duration: 0.2, ease: "easeOut" }}
-                    className="absolute right-0 z-50 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl py-2 border border-gray-100 dark:border-gray-700 overflow-hidden glass-effect"
+                    className="absolute right-0 z-50 mt-2 w-56 bg-white/95 dark:bg-gray-800/95 rounded-lg shadow-xl py-2 border border-gray-100 dark:border-gray-700 overflow-hidden glass-effect"
                   >
                     {/* User info header with subtle animation */}
                     <motion.div 
@@ -901,14 +901,14 @@ const animationStyles = `
 
 /* Glassmorphism effects */
 .glass-effect {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 .dark .glass-effect {
-  background: rgba(15, 23, 42, 0.1);
+  background: rgba(15, 23, 42, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 

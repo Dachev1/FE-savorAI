@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from '../../api/axiosConfig';
+import { recipeServiceAxios } from '../../api/axiosConfig';
 import { useAuth } from '../../context';
 import { LoadingSpinner } from '../../components/common';
 import { FaRobot, FaClock, FaArrowLeft, FaFireAlt, FaDumbbell, FaCarrot, FaOilCan } from 'react-icons/fa';
@@ -81,7 +82,7 @@ const RecipePreview: React.FC = () => {
       
       try {
         setLoading(true);
-        const response = await axios.get(`/api/v1/recipes/${id}`);
+        const response = await recipeServiceAxios.get(`/api/v1/recipes/${id}`);
         
         // Normalize recipe data to handle missing properties
         const normalizedRecipe = {
@@ -146,7 +147,7 @@ const RecipePreview: React.FC = () => {
     
     try {
       setSaveClicked(true);
-      await axios.post(`/api/v1/favorites/recipes/${id}`);
+      await recipeServiceAxios.post(`/api/v1/favorites/recipes/${id}`);
       
       // Navigate to recipe detail on successful save
       navigate(`/recipes/${id}`);

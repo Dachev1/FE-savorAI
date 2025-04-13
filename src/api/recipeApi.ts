@@ -1,4 +1,5 @@
 import axios from './axiosConfig';
+import { recipeServiceAxios } from './axiosConfig';
 
 interface PageResponse<T> {
   content: T[];
@@ -21,7 +22,7 @@ const RecipeAPI = {
    */
   getRecipeFeed: async (page = 0, size = 10, sortBy = 'newest') => {
     try {
-      const response = await axios.get(`/v1/recipes/feed?page=${page}&size=${size}&sort=${sortBy}`);
+      const response = await recipeServiceAxios.get(`/v1/recipes/feed?page=${page}&size=${size}&sort=${sortBy}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching recipe feed:', error);
@@ -34,7 +35,7 @@ const RecipeAPI = {
    */
   getRecipeDebug: async (id: string) => {
     try {
-      const response = await axios.get(`/v1/recipes/debug/${id}`);
+      const response = await recipeServiceAxios.get(`/v1/recipes/debug/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching recipe data:', error);

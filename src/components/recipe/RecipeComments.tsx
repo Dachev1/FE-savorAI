@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../../api/axiosConfig';
+import { recipeServiceAxios } from '../../api/axiosConfig';
 import { useAuth } from '../../context';
-import { FaUser, FaTrash, FaSpinner, FaTimes, FaExclamationCircle } from 'react-icons/fa';
-import { formatDistanceToNow } from 'date-fns';
+import { FaUser, FaTrash, FaSpinner, FaTimes, FaExclamationCircle, FaPaperPlane } from 'react-icons/fa';
 
 interface CommentProps {
   id: string;
@@ -13,6 +13,7 @@ interface CommentProps {
   createdAt: string;
   updatedAt: string;
   isOwner: boolean;
+  isRecipeOwner: boolean;
 }
 
 interface RecipeCommentsProps {
@@ -26,6 +27,8 @@ const RecipeComments: React.FC<RecipeCommentsProps> = ({ recipeId, isRecipeOwner
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  const [newComment, setNewComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch comments
   useEffect(() => {
@@ -35,7 +38,7 @@ const RecipeComments: React.FC<RecipeCommentsProps> = ({ recipeId, isRecipeOwner
   const fetchComments = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/v1/recipes/${recipeId}/comments`);
+      const response = await recipeServiceAxios.get(`/v1/recipes/${recipeId}/comments`);
       setComments(response.data.content || []);
       setError(null);
     } catch (err) {
@@ -54,7 +57,7 @@ const RecipeComments: React.FC<RecipeCommentsProps> = ({ recipeId, isRecipeOwner
 
     setDeletingCommentId(commentId);
     try {
-      await axios.delete(`/v1/recipes/comments/${commentId}`);
+      await recipeServiceAxios.delete(`/v1/recipes/comments/${commentId}`);
       setComments(comments.filter(comment => comment.id !== commentId));
     } catch (err) {
       console.error('Error deleting comment:', err);
@@ -67,9 +70,59 @@ const RecipeComments: React.FC<RecipeCommentsProps> = ({ recipeId, isRecipeOwner
   // Format date
   const formatDate = (dateString: string) => {
     try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
     } catch (error) {
       return 'some time ago';
+    }
+  };
+
+  // Submit a new comment
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!isAuthenticated) {
+      setError('You must be signed in to comment.');
+      return;
+    }
+    
+    if (isRecipeOwner) {
+      setError('You cannot comment on your own recipe.');
+      return;
+    }
+    
+    if (!newComment.trim()) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setError(null);
+    
+    try {
+      const response = await recipeServiceAxios.post(`/v1/recipes/${recipeId}/comments`, {
+        content: newComment.trim()
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      // Add the new comment to the list and refresh comments
+      await fetchComments();
+      
+      // Clear the input
+      setNewComment('');
+    } catch (err) {
+      console.error('Failed to submit comment:', err);
+      setError('Failed to submit your comment. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -80,6 +133,44 @@ const RecipeComments: React.FC<RecipeCommentsProps> = ({ recipeId, isRecipeOwner
           Comments ({comments.length})
         </h3>
       </div>
+
+      {/* Comment form */}
+      {isAuthenticated && !isRecipeOwner ? (
+        <div className="p-4 border-b border-gray-100 dark:border-gray-700">
+          <form onSubmit={handleSubmitComment} className="flex flex-col">
+            <textarea
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Add a comment..."
+              className="w-full p-3 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-800 dark:text-white resize-none"
+              rows={3}
+              disabled={isSubmitting}
+            />
+            <div className="flex justify-end mt-2">
+              <button
+                type="submit"
+                disabled={isSubmitting || !newComment.trim()}
+                className={`px-4 py-2 rounded-lg flex items-center ${
+                  !newComment.trim() || isSubmitting
+                    ? 'bg-gray-300 dark:bg-gray-600 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                } transition-colors`}
+              >
+                <FaPaperPlane className="mr-2" />
+                {isSubmitting ? 'Posting...' : 'Post Comment'}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : isRecipeOwner ? (
+        <div className="p-4 border-b border-gray-100 dark:border-gray-700 text-center text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700">
+          <p>You cannot comment on your own recipe</p>
+        </div>
+      ) : (
+        <div className="p-4 border-b border-gray-100 dark:border-gray-700 text-center">
+          <p className="text-gray-600 dark:text-gray-400">Please sign in to leave a comment</p>
+        </div>
+      )}
 
       {/* Error state */}
       {error && (
