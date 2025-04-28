@@ -1,5 +1,10 @@
 # SavorAI - Frontend Application
 
+## Related Repositories
+
+- [recipe-service-SavorAI](https://github.com/Dachev1/recipe-service-SavorAI) - Recipe management service
+- [user-service-SavorAI](https://github.com/Dachev1/user-service-SavorAI) - User authentication and management service 
+
 ## Overview
 
 SavorAI is a modern web application that combines AI-powered recipe generation with social features, allowing users to create, share, and discover unique recipes. This repository contains the frontend component of SavorAI, built with React, TypeScript, and Tailwind CSS.
@@ -124,8 +129,3 @@ The application is configured for easy deployment on various platforms:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Related Repositories
-
-- [recipe-service-SavorAI](https://github.com/Dachev1/recipe-service-SavorAI) - Recipe management service
-- [user-service-SavorAI](https://github.com/Dachev1/user-service-SavorAI) - User authentication and management service 
