@@ -127,5 +127,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Related Repositories
 
-- [recipe-service-SavorAI](https://github.com/yourusername/recipe-service-SavorAI) - Recipe management service
-- [user-service-SavorAI](https://github.com/yourusername/user-service-SavorAI) - User authentication and management service 
+- [recipe-service-SavorAI](https://github.com/Dachev1/recipe-service-SavorAI) - Recipe management service
+- [user-service-SavorAI](https://github.com/Dachev1/user-service-SavorAI) - User authentication and management service 
