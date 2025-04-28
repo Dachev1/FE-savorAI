@@ -36,7 +36,7 @@ const CommentList: React.FC<CommentListProps> = ({ recipeId, authorId }) => {
     setError(null);
     
     try {
-      const response = await recipeServiceAxios.get(`/v1/comments/${recipeId}`);
+      const response = await recipeServiceAxios.get(`/api/v1/recipes/${recipeId}/comments`);
       setComments(response.data || []);
     } catch (err) {
       console.error('Failed to fetch comments:', err);
@@ -73,8 +73,7 @@ const CommentList: React.FC<CommentListProps> = ({ recipeId, authorId }) => {
     setError(null);
     
     try {
-      const response = await recipeServiceAxios.post('/v1/comments', {
-        recipeId,
+      const response = await recipeServiceAxios.post(`/api/v1/recipes/${recipeId}/comments`, {
         content: newComment.trim()
       });
       
@@ -96,7 +95,7 @@ const CommentList: React.FC<CommentListProps> = ({ recipeId, authorId }) => {
     if (!isAuthenticated) return;
     
     try {
-      await recipeServiceAxios.delete(`/v1/comments/${commentId}`);
+      await recipeServiceAxios.delete(`/api/v1/recipes/comments/${commentId}`);
       
       // Remove the deleted comment from the list
       setComments(prevComments => 

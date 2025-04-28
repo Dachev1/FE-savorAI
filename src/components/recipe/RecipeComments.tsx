@@ -38,7 +38,7 @@ const RecipeComments: React.FC<RecipeCommentsProps> = ({ recipeId, isRecipeOwner
   const fetchComments = async () => {
     try {
       setLoading(true);
-      const response = await recipeServiceAxios.get(`/v1/recipes/${recipeId}/comments`);
+      const response = await recipeServiceAxios.get(`/api/v1/recipes/${recipeId}/comments`);
       setComments(response.data.content || []);
       setError(null);
     } catch (err) {
@@ -57,7 +57,7 @@ const RecipeComments: React.FC<RecipeCommentsProps> = ({ recipeId, isRecipeOwner
 
     setDeletingCommentId(commentId);
     try {
-      await recipeServiceAxios.delete(`/v1/recipes/comments/${commentId}`);
+      await recipeServiceAxios.delete(`/api/v1/recipes/comments/${commentId}`);
       setComments(comments.filter(comment => comment.id !== commentId));
     } catch (err) {
       console.error('Error deleting comment:', err);
@@ -105,7 +105,7 @@ const RecipeComments: React.FC<RecipeCommentsProps> = ({ recipeId, isRecipeOwner
     setError(null);
     
     try {
-      const response = await recipeServiceAxios.post(`/v1/recipes/${recipeId}/comments`, {
+      const response = await recipeServiceAxios.post(`/api/v1/recipes/${recipeId}/comments`, {
         content: newComment.trim()
       }, {
         headers: {

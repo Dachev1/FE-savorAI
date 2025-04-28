@@ -5,8 +5,8 @@ import { recipeServiceAxios } from './axiosConfig';
  * Vote types for a recipe
  */
 export enum VoteType {
-  UP = 'up',
-  DOWN = 'down'
+  UP = 'UPVOTE',
+  DOWN = 'DOWNVOTE'
 }
 
 /**
@@ -16,7 +16,7 @@ export const VoteService = {
   /**
    * Vote on a recipe (up or down)
    * @param recipeId - Recipe ID
-   * @param voteType - Vote type ('up' or 'down')
+   * @param voteType - Vote type ('UPVOTE' or 'DOWNVOTE')
    * @returns The updated recipe data
    */
   voteRecipe: async (recipeId: string, voteType: VoteType) => {

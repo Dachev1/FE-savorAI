@@ -48,7 +48,7 @@ const api = axios.create({
 
 // Route API requests to the correct service
 api.interceptors.request.use(async (config) => {
-  config.baseURL = config.url?.includes('/v1/recipes') 
+  config.baseURL = config.url?.includes('/v1/recipes') || config.url?.includes('/api/v1/recipes')
     ? API_CONFIG.RECIPE_SERVICE 
     : API_CONFIG.USER_SERVICE;
   return config;

@@ -5,6 +5,7 @@ import 'aos/dist/aos.css';
 import { useAuth, useDarkMode } from '../context';
 import { FiZap, FiPlusCircle, FiBookOpen } from 'react-icons/fi';
 import { FaRobot, FaHeart, FaUsers, FaClock, FaLeaf, FaUtensils, FaStar } from 'react-icons/fa';
+import { BannedUserNotice } from '../components/common';
 
 // Memoized card components
 const FeatureCard = memo<{ icon: React.ReactNode; title: string; description: string; delay: number }>(({ 
@@ -69,6 +70,10 @@ BenefitCard.displayName = 'BenefitCard';
 // Memoized authenticated home component
 const AuthenticatedHome = memo(() => {
   const { isDarkMode } = useDarkMode();
+  const { user } = useAuth();
+  
+  // Check if user is banned
+  const isBanned = user?.banned === true || String(user?.banned) === 'true';
   
   return (
     <section className="w-full py-8" aria-labelledby="welcome-heading">
@@ -86,6 +91,13 @@ const AuthenticatedHome = memo(() => {
           </span>
         </h1>
         
+        {/* Show ban notice if user is banned */}
+        {isBanned && (
+          <div className="mb-8">
+            <BannedUserNotice username={user?.username} />
+          </div>
+        )}
+        
         <div className="grid md:grid-cols-3 gap-6">
           {/* Generate Recipe Card */}
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden border border-gray-200 dark:border-gray-700">
@@ -99,7 +111,12 @@ const AuthenticatedHome = memo(() => {
               </p>
               <Link 
                 to="/recipe/generator" 
-                className="w-full block text-center py-2 px-4 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
+                className={`w-full block text-center py-2 px-4 ${
+                  isBanned 
+                    ? "bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                    : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40"
+                } rounded-lg transition-colors`}
+                onClick={isBanned ? (e) => e.preventDefault() : undefined}
               >
                 Generate Now
               </Link>

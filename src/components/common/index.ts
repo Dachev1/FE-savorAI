@@ -13,5 +13,6 @@ export { default as TabContainer } from './TabContainer';
 export { default as ProfileCard } from './ProfileCard';
 export { default as ResponsiveImage } from './ResponsiveImage';
 export { default as AnimatedTransition } from './AnimatedTransition';
+export { default as BannedUserNotice } from './BannedUserNotice';
 
 // Export other common components that might exist in the codebase 

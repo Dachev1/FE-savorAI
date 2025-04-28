@@ -140,7 +140,7 @@ export default {
       },
     },
     plugins: [
-      require('@tailwindcss/line-clamp'),
+      // The @tailwindcss/line-clamp plugin has been removed as it's now included in Tailwind CSS v3.3+
     ],
     future: {
       hoverOnlyWhenSupported: true,

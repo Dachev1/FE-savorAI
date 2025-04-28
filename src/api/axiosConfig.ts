@@ -31,6 +31,16 @@ export const recipeServiceAxios = axios.create({
   timeout: 30000 // 30 second timeout
 });
 
+// Add interceptor to automatically prepend "/api" to recipe service endpoints
+recipeServiceAxios.interceptors.request.use(config => {
+  // Check if URL starts with /v1/ but doesn't already have /api/
+  if (config.url && config.url.startsWith('/v1/') && !config.url.includes('/api/')) {
+    // Replace /v1/ with /api/v1/
+    config.url = config.url.replace('/v1/', '/api/v1/');
+  }
+  return config;
+});
+
 // Add ability to cancel pending requests
 axiosInstance.cancelPendingRequests = () => {
   pendingRequests.forEach((source, key) => {
@@ -112,6 +122,14 @@ const setupInterceptors = (instance: typeof axiosInstance, servicePrefix = '') =
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
+      }
+      
+      // Check if the URL is for recipe service
+      if (config.url && (
+        config.url.includes('/api/v1/recipes') || 
+        config.url.includes('/api/v1/favorites')
+      )) {
+        config.baseURL = 'http://localhost:8082'; // Recipe service
       }
       
       return config;

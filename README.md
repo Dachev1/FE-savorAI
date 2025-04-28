@@ -1,200 +1,131 @@
-# SavorAI
+# SavorAI - Frontend Application
 
-<p align="center">
-  <img src="public/logo.png" alt="SavorAI Logo" width="200">
-</p>
+## Overview
 
-<p align="center">
-  <a href="https://github.com/yourusername/savorAI/releases">
-    <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
-  </a>
-  <a href="https://github.com/yourusername/savorAI/blob/main/LICENSE">
-    <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
-  </a>
-  <a href="https://github.com/yourusername/savorAI/actions">
-    <img src="https://img.shields.io/badge/build-passing-success.svg" alt="Build Status">
-  </a>
-  <a href="https://react.dev/">
-    <img src="https://img.shields.io/badge/React-18-61DAFB.svg" alt="React">
-  </a>
-  <a href="https://www.typescriptlang.org/">
-    <img src="https://img.shields.io/badge/TypeScript-5.6-3178C6.svg" alt="TypeScript">
-  </a>
-</p>
+SavorAI is a modern web application that combines AI-powered recipe generation with social features, allowing users to create, share, and discover unique recipes. This repository contains the frontend component of SavorAI, built with React, TypeScript, and Tailwind CSS.
 
-<p align="center">
-  AI-powered recipe generator and culinary management platform
-</p>
+## Features
 
-## ✨ Features
+- **AI-Powered Recipe Generation**: Create personalized recipes based on ingredients, dietary preferences, and cuisine types
+- **User Authentication**: Secure sign-up, sign-in, and account management
+- **Recipe Management**: Create, view, edit, and delete your own recipes
+- **Social Interaction**: Discover recipes from other users, add favorites, and leave comments
+- **Responsive Design**: Optimized user experience across desktop and mobile devices
+- **Admin Dashboard**: Moderation tools for administrators
+- **Profile Management**: Update personal information and preferences
 
-- **AI Recipe Generation** - Create custom recipes based on ingredients, dietary restrictions, and cuisine preferences
-- **Personal Recipe Collection** - Save, organize, and share your favorite recipes
-- **Responsive Design** - Seamless experience across desktop, tablet, and mobile devices
-- **User Authentication** - Secure login and personalized experience
-- **Interactive Cooking Mode** - Step-by-step guided cooking instructions
+## Tech Stack
 
-## 📱 Screenshots
-
-<p align="center">
-  <img src="public/screenshots/home.png" alt="Home Screen" width="280">
-  <img src="public/screenshots/recipe.png" alt="Recipe View" width="280">
-  <img src="public/screenshots/generator.png" alt="Recipe Generator" width="280">
-</p>
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Node.js v18+
-- npm or yarn
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/savorAI.git
-cd savorAI
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-# Create .env file with required variables (example in .env.example)
-
-# Start development server
-npm run dev
-```
-
-Visit `http://localhost:5173` in your browser.
-
-## 🔧 Tech Stack
-
-- **Frontend Framework**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS + Material UI
-- **State Management**: React Context API
+- **Framework**: React 18 with TypeScript
 - **Routing**: React Router v7
-- **Form Handling**: Formik + Yup
-- **HTTP Client**: Axios
-- **Animation**: Framer Motion + AOS
-- **UI Components**: Custom components + Material UI
+- **State Management**: React Context API and custom hooks
+- **Styling**: Tailwind CSS with custom components
+- **UI Components**: Material UI (MUI) integration
+- **Forms**: Formik for form handling and Yup for validation
+- **HTTP Client**: Axios for API communication
+- **Animations**: Framer Motion and AOS (Animate On Scroll)
+- **Build Tool**: Vite
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 src/
-├── api/          # API services and configuration
+├── api/          # API service integrations
 ├── components/   # Reusable UI components
 ├── constants/    # Application constants
-├── context/      # React context providers
+├── context/      # React Context providers
 ├── hooks/        # Custom React hooks
-├── pages/        # Application views/pages
+├── pages/        # Page components
 ├── routes/       # Route definitions
 ├── services/     # Business logic services
-├── styles/       # Global styles
-├── types/        # TypeScript types and interfaces
+├── styles/       # Global styles and theme
+├── types/        # TypeScript type definitions
 ├── utils/        # Utility functions
 ├── App.tsx       # Main application component
 └── main.tsx      # Application entry point
 ```
 
-## ⚙️ Configuration
+## Getting Started
 
-### Environment Variables
+### Prerequisites
 
-Create a `.env` file in the project root:
+- Node.js (v18+)
+- npm or yarn
 
-```
-# API Configuration
-VITE_API_URL=http://localhost:8082
-VITE_AUTH_REDIRECT_URL=http://localhost:5173/signin?verified=true
-```
+### Installation
 
-### API Configuration
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/FE-savorAI.git
+   cd FE-savorAI
+   ```
 
-Backend API is proxied through `/api` to avoid CORS issues:
+2. Install dependencies:
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
 
-```typescript
-// vite.config.ts
-server: {
-  proxy: {
-    '/api': {
-      target: 'http://localhost:8081',
-      changeOrigin: true,
-      secure: false,
-      rewrite: (path) => path.replace(/^\/api/, '')
-    }
-  }
-}
-```
+3. Configure environment variables:
+   Create a `.env` file in the root directory with the following variables:
+   ```
+   VITE_API_BASE_URL=http://localhost:8080
+   VITE_USER_SERVICE_URL=http://localhost:8081
+   VITE_RECIPE_SERVICE_URL=http://localhost:8082
+   ```
 
-## 📋 Available Scripts
+4. Start the development server:
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server |
-| `npm run build` | Build for production |
-| `npm run serve` | Preview production build |
-| `npm run lint` | Run ESLint |
-| `npm run preview` | Preview build |
-| `npm run clean` | Clean build artifacts |
-| `npm run analyze` | Analyze bundle size |
-| `npm run typecheck` | Check TypeScript types |
+5. Access the application at `http://localhost:5173`
 
-## 🚢 Deployment
+## Available Scripts
 
-```bash
-# Build for production
-npm run build
+- `npm run dev` - Start the development server
+- `npm run build` - Build the application for production
+- `npm run serve` - Preview the production build locally
+- `npm run lint` - Run ESLint to check for code issues
+- `npm run typecheck` - Run TypeScript type checking
+- `npm run clean` - Remove build artifacts and cache
+- `npm run analyze` - Analyze bundle size and dependencies
 
-# Preview production build locally
-npm run serve
-```
+## Deployment
 
-### Deployment Options
+The application is configured for easy deployment on various platforms:
 
-- **Vercel**: Connect GitHub repository for automatic deployments
-- **Netlify**: Connect GitHub or upload `dist` folder
-- **Docker**: Use included Dockerfile
-- **Static Hosting**: Deploy `dist` directory to any static host
+1. **Build the application**:
+   ```bash
+   npm run build
+   ```
 
-## 🔍 Performance Optimization
+2. **Deploy the contents of the `dist` directory** to your preferred hosting service (Netlify, Vercel, AWS S3, etc.)
 
-- Code splitting via dynamic imports
-- Optimized chunk strategy for vendor dependencies
-- Image optimization with responsive loading
-- Lazy-loaded routes and components
+## Performance Considerations
 
-## 🐛 Troubleshooting
+- The application uses code-splitting via React.lazy for better loading performance
+- Connection quality detection to adapt the UI for low-bandwidth scenarios
+- Optimized image loading and processing
+- Caching of API responses where appropriate
+- Minimized bundle size with tree shaking and lazy loading
 
-### Common Issues
-
-- **API Connection Errors**: Verify backend server is running and `.env` has correct `VITE_API_URL`
-- **Build Errors**: Run `npm run clean` and try rebuilding
-- **TypeScript Errors**: Run `npm run typecheck` to identify issues
-
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
-2. Create feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'Add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+2. Create a feature branch: `git checkout -b feature/your-feature-name`
+3. Commit your changes: `git commit -m 'Add some feature'`
+4. Push to the branch: `git push origin feature/your-feature-name`
+5. Open a pull request
 
-Please follow code style guidelines and include appropriate tests.
+## License
 
-## 📄 License
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
+## Related Repositories
 
-## 👥 Contributors
-
-- Your Name - [GitHub](https://github.com/yourusername)
-
-## 🙏 Acknowledgments
-
-- [React](https://react.dev/) - UI library
-- [Vite](https://vitejs.dev/) - Frontend tooling
-- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
-- [Material UI](https://mui.com/) - React UI components
+- [recipe-service-SavorAI](https://github.com/yourusername/recipe-service-SavorAI) - Recipe management service
+- [user-service-SavorAI](https://github.com/yourusername/user-service-SavorAI) - User authentication and management service 

@@ -84,10 +84,12 @@ const RecipeFeed: React.FC = () => {
 
   // Normalize recipe data to handle missing fields and format properly
   const normalizeRecipe = (recipe: any): Recipe => {
+    console.log(">>> [RecipeFeed] Input recipe object:", JSON.stringify(recipe, null, 2));
     const normalized = { ...recipe };
     
     // Ensure authorId is set (from createdById if needed)
     if (!normalized.authorId && normalized.createdById) {
+      console.log(`>>> [RecipeFeed] Setting authorId from createdById: ${normalized.createdById}`);
       normalized.authorId = normalized.createdById;
     }
     
@@ -95,16 +97,20 @@ const RecipeFeed: React.FC = () => {
     // First prefer username if available
     if (normalized.username && normalized.username !== "Unknown User") {
       normalized.displayName = normalized.username;
+      console.log(`>>> [RecipeFeed] Using username: ${normalized.displayName}`);
     } 
     // Then try authorName if available
     else if (normalized.authorName && normalized.authorName !== "Unknown User") {
       normalized.displayName = normalized.authorName;
+       console.log(`>>> [RecipeFeed] Using authorName: ${normalized.displayName}`);
     }
-    // Fall back to user ID if available
+    // Fall back to "Unknown User" if no username is available
     else {
-      normalized.displayName = normalized.authorId ? `User: ${normalized.authorId.substring(0, 8)}` : "Unknown";
+      normalized.displayName = "Unknown User";
+      console.log(`>>> [RecipeFeed] Falling back to Unknown User. authorId: ${normalized.authorId}, username: ${normalized.username}, authorName: ${normalized.authorName}`);
     }
     
+    console.log(">>> [RecipeFeed] Final displayName:", normalized.displayName);
     return normalized;
   };
 
@@ -340,7 +346,7 @@ const RecipeFeed: React.FC = () => {
                         </div>
                         <div className="flex flex-col">
                           <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                            {recipe.displayName || (recipe.authorId ? `User: ${recipe.authorId.substring(0, 8)}` : 'Unknown')}
+                            {recipe.displayName}
                           </span>
                           <span className="text-xs text-gray-500 dark:text-gray-400">
                             {formatDate(recipe.createdAt)}

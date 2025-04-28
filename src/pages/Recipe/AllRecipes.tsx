@@ -57,8 +57,8 @@ const AllRecipes: React.FC = () => {
   const fetchAllRecipes = async () => {
     try {
       setLoading(true);
-      const response = await recipeServiceAxios.get('/v1/recipes/community');
-      setRecipes(response.data);
+      const response = await recipeServiceAxios.get('/api/v1/recipes/community');
+      setRecipes(response.data.content || []);
       setError(null);
     } catch (err) {
       console.error('Error fetching recipes:', err);

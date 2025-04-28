@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import api from '../../api/apiService';
 import { LoadingSpinner } from '../../components/common';
-import { ToastType } from '../../components/common/Toast';
+import type { ToastType } from '../../components/common/Toast';
 import auth from '../../utils/auth';
 
 interface User {
@@ -18,16 +18,12 @@ interface User {
   lastLogin?: string;
 }
 
-// Helper to ensure banned status is consistently a boolean
-const normalizeBannedStatus = (value: any): boolean => {
-  // Enhanced parsing - first check string representations
-  if (typeof value === 'string') {
-    const lowercased = value.toLowerCase();
-    return lowercased === 'true' || lowercased === '1' || lowercased === 'yes';
+// Fix to normalize banned status for different backends
+const normalizeBannedStatus = (banned: any): boolean => {
+  if (banned === true || banned === 'true' || banned === 'TRUE' || banned === 1) {
+    return true;
   }
-  
-  // Then handle direct boolean or number values
-  return value === true || value === 1;
+  return false;
 };
 
 // Session storage keys
@@ -182,9 +178,7 @@ const AdminDashboard: React.FC = () => {
         return {
           ...user,
           // Convert banned property to a strict boolean
-          banned: isBanned,
-          // Store original value for debugging
-          bannedType: typeof user.banned
+          banned: isBanned
         };
       });
       
@@ -373,16 +367,9 @@ const AdminDashboard: React.FC = () => {
         return;
       }
       
-      // Ensure we have the correct banned status
-      const isBanned = normalizeBannedStatus(targetUser.banned);
-      
-      // Show enhanced confirmation dialog with user details
-      const action = isBanned ? 'unban' : 'ban';
-      const message = isBanned
-        ? `Are you sure you want to UNBAN user "${targetUser.username}" (${targetUser.email})?\n\nThis will restore their access to the platform.`
-        : `Are you sure you want to BAN user "${targetUser.username}" (${targetUser.email})?\n\nThis will completely restrict their access to the platform and invalidate all active sessions.`;
-        
-      if (!window.confirm(message)) {
+      // Show appropriate confirmation dialog
+      const action = currentlyBanned ? 'unban' : 'ban';
+      if (!window.confirm(`Are you sure you want to ${action} user "${targetUser.username}"?`)) {
         return;
       }
       
@@ -394,7 +381,7 @@ const AdminDashboard: React.FC = () => {
         throw new Error('Authentication token not found');
       }
       
-      // Create request config
+      // Create request config with auth token
       const config = {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -407,42 +394,39 @@ const AdminDashboard: React.FC = () => {
       
       // Handle successful response
       if (response.data && response.data.success) {
-        const actionType = response.data.message.includes('banned') ? 'banned' : 'unbanned';
-        showToast(`User ${actionType} successfully`, 'success');
+        // Show success message
+        const message = currentlyBanned ? 
+          `User "${targetUser.username}" has been unbanned.` : 
+          `User "${targetUser.username}" has been banned.`;
+        showToast(message, 'success');
         
-        // Clear any cached data
+        // Aggressively clear all user caches to ensure fresh data
         sessionStorage.removeItem(SESSION_KEYS.ADMIN_USERS_FETCHED);
-        sessionStorage.removeItem(SESSION_KEYS.ADMIN_ROLE_VERIFIED);
+        sessionStorage.removeItem(SESSION_KEYS.ADMIN_USERS_CACHE);
+        sessionStorage.removeItem(SESSION_KEYS.ADMIN_USERS_TIMESTAMP);
+        localStorage.removeItem('user_cache');
         
-        // Force token refresh first
-        auth.forceTokenRefresh();
-        
-        // Immediately update the UI to show the change while the refresh happens
-        setUsers(prev => prev.map(user => {
-          if (user.id === userId) {
-            return {
-              ...user,
-              banned: !isBanned
-            };
+        // Clear any related caches in other parts of the app
+        Object.keys(sessionStorage).forEach(key => {
+          if (key.includes('user') || key.includes('cache')) {
+            sessionStorage.removeItem(key);
           }
-          return user;
-        }));
+        });
         
-        console.log(`User ${targetUser.username} has been ${actionType}. Refreshing data...`);
-        
-        // Fetch fresh data from server
-        await fetchUsers();
+        // Fetch fresh data immediately
+        await fetchUsers(true);
       } else {
-        throw new Error(response.data?.message || `Failed to ${action} user`);
+        throw new Error(response.data?.message || 'Failed to update user ban status');
       }
     } catch (error: any) {
       // Handle error
       const errorMessage = error.response?.data?.message || error.message || 'Error updating ban status';
       showToast(errorMessage, 'error');
     } finally {
+      // Reset state
       setActionInProgress(null);
     }
-  }, [showToast, validateAdminStatus, users, fetchUsers]);
+  }, [showToast, validateAdminStatus, fetchUsers, users]);
 
   const handleCopyId = (userId: string) => {
     const user = users.find(u => u.id === userId);

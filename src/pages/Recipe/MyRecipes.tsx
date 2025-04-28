@@ -61,7 +61,7 @@ const MyRecipes: React.FC = () => {
     
     setLoading(true);
     try {
-      const response = await recipeServiceAxios.get('/v1/recipes/my-recipes');
+      const response = await recipeServiceAxios.get('/api/v1/recipes/my-recipes');
       setRecipes(response.data);
       setError(null);
     } catch (err) {
@@ -81,7 +81,7 @@ const MyRecipes: React.FC = () => {
     if (window.confirm('Are you sure you want to delete this recipe? This action cannot be undone.')) {
       setDeletingRecipeId(recipeId);
       try {
-        await axios.delete(`/v1/recipes/${recipeId}`);
+        await axios.delete(`/api/v1/recipes/${recipeId}`);
         setRecipes(recipes.filter(recipe => recipe.id !== recipeId));
       } catch (err) {
         console.error('Error deleting recipe:', err);

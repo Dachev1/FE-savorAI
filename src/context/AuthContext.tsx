@@ -138,18 +138,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Handle user banning
   const handleUserBanned = useCallback(() => {
-    sessionStorage.clear();
-    auth.clearAuth();
+    // Do not clear session storage or auth immediately
+    // Instead, update user state to include banned status
+    const currentUser = auth.getUser<User>();
     
-    Object.keys(localStorage).forEach(key => {
-      if (key.includes('user') || key.includes('admin') || key.includes('auth')) {
-        localStorage.removeItem(key);
-      }
-    });
-    
-    updateUserState(null);
-    showToast('Your account has been banned.', 'error', 5000);
-    navigate(ROUTES.SIGN_IN);
+    if (currentUser) {
+      const updatedUser = {
+        ...currentUser,
+        banned: true
+      };
+      
+      // Update user object but don't log out completely
+      updateUserState(updatedUser);
+      
+      // Show a more informative toast that doesn't immediately dismiss
+      showToast(
+        'Your account has been restricted. Please contact support for assistance.',
+        'warning', 
+        10000
+      );
+      
+      // Redirect to a banned user page or dashboard that explains the restriction
+      navigate(ROUTES.HOME);
+    }
   }, [showToast, updateUserState, navigate]);
 
   // Background polling for ban status

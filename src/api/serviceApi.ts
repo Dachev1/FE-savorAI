@@ -97,89 +97,22 @@ export const recipeService = {
     recipeApi.get(`${API_PATHS.RECIPE.GET_ONE}${id}`),
   
   getMyRecipes: () => 
-    recipeApi.get(`/v1/recipes/my-recipes`),
+    recipeApi.get(`/api/v1/recipes/my-recipes`),
   
-  createRecipe: async (formData: FormData) => {
-    console.log('Creating new recipe');
-    const directUrl = '/api/v1/recipes';
-    console.log(`API endpoint for creation: ${directUrl}`);
-    
-    try {
-      return await recipeApi.post(directUrl, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-    } catch (error: any) {
-      // If we get a 404, try the alternative URL format
-      if (error.response && error.response.status === 404) {
-        console.log('First URL attempt failed with 404, trying alternative URL format');
-        const altUrl = '/v1/recipes';
-        console.log(`Trying alternative API endpoint: ${altUrl}`);
-        
-        return recipeApi.post(altUrl, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-      }
-      
-      // If it's not a 404 or the second attempt fails, throw the error
-      throw error;
-    }
-  },
+  createRecipe: (formData: FormData) => 
+    recipeApi.post(API_PATHS.RECIPE.CREATE, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
   
-  updateRecipe: async (id: string, formData: FormData) => {
-    console.log(`Updating recipe with ID: ${id}`);
-    
-    // Try with direct URL first
-    const directUrl = `/api/v1/recipes/${id}/multipart`;
-    console.log(`Trying API endpoint: ${directUrl}`);
-    
-    try {
-      return await recipeApi.put(directUrl, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-    } catch (error: any) {
-      // If we get a 404, try the alternative URL format
-      if (error.response && error.response.status === 404) {
-        console.log('First URL attempt failed with 404, trying alternative URL format');
-        const altUrl = `/v1/recipes/${id}/multipart`;
-        console.log(`Trying alternative API endpoint: ${altUrl}`);
-        
-        return recipeApi.put(altUrl, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-      }
-      
-      // If it's not a 404 or the second attempt fails, throw the error
-      throw error;
-    }
-  },
+  updateRecipe: (id: string, formData: FormData) => 
+    recipeApi.put(`${API_PATHS.RECIPE.UPDATE}${id}/multipart`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
   
-  updateRecipeSimple: async (id: string, data: any) => {
-    console.log(`Updating recipe with simple JSON data, ID: ${id}`);
-    
-    // Try with direct URL first
-    const directUrl = `/api/v1/recipes/${id}`;
-    console.log(`Trying API endpoint: ${directUrl}`);
-    
-    try {
-      return await recipeApi.put(directUrl, data, {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    } catch (error: any) {
-      // If we get a 404, try the alternative URL format
-      if (error.response && error.response.status === 404) {
-        console.log('First URL attempt failed with 404, trying alternative URL format');
-        const altUrl = `/v1/recipes/${id}`;
-        console.log(`Trying alternative API endpoint: ${altUrl}`);
-        
-        return recipeApi.put(altUrl, data, {
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-      
-      // If it's not a 404 or the second attempt fails, throw the error
-      throw error;
-    }
-  },
+  updateRecipeSimple: (id: string, data: any) => 
+    recipeApi.put(`${API_PATHS.RECIPE.UPDATE}${id}`, data, {
+      headers: { 'Content-Type': 'application/json' }
+    }),
   
   deleteRecipe: (id: string) => 
     recipeApi.delete(`${API_PATHS.RECIPE.DELETE}${id}`),

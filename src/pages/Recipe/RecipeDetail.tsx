@@ -114,7 +114,7 @@ const RecipeDetail: React.FC = () => {
       const normalizedRecipe = {
         ...response.data,
         tags: response.data.tags || [],
-        description: response.data.description || response.data.servingSuggestions || '',
+        description: response.data.description || '',
         authorName: response.data.authorName || 'Unknown',
         totalTimeMinutes: response.data.totalTimeMinutes || 
                          ((response.data.prepTime || 0) + (response.data.cookTime || 0)),

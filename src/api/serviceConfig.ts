@@ -19,7 +19,7 @@ export const API_PATHS = {
   // User endpoints (User Service - 8081)
   USER: {
     PROFILE: '/api/v1/profile',
-    UPDATE_USERNAME: '/api/v1/user/update-username',
+    UPDATE_USERNAME: '/api/v1/auth/change-username',
     UPDATE_PASSWORD: '/api/v1/user/update-password'
   },
   
