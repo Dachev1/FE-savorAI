@@ -1,5 +1,7 @@
 # SavorAI - Frontend Application
 
+## Demo Video -> https://www.youtube.com/watch?v=uW0iGkXWBJA
+
 ## Related Repositories
 
 - [recipe-service-SavorAI](https://github.com/Dachev1/recipe-service-SavorAI) - Recipe management service
